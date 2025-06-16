@@ -1,0 +1,264 @@
+{
+    "openlabel": {
+        "metadata": {
+            "schema_version": "1.0.0"
+        },
+        "coordinate_systems": 2387,
+        "frames": {
+            "2387": {
+                "objects": {
+                    "0": {
+                        "object_data": {
+                            "name": "PEDESTRIAN_0",
+                            "type": "PEDESTRIAN",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        577,
+                                        95,
+                                        12,
+                                        30
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "1": {
+                        "object_data": {
+                            "name": "TRUCK_1",
+                            "type": "TRUCK",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        331,
+                                        58,
+                                        45,
+                                        55
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "2": {
+                        "object_data": {
+                            "name": "CAR_2",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        358,
+                                        24,
+                                        17,
+                                        16
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "3": {
+                        "object_data": {
+                            "name": "CAR_3",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        228,
+                                        25,
+                                        30,
+                                        22
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "4": {
+                        "object_data": {
+                            "name": "CAR_4",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        161,
+                                        15,
+                                        25,
+                                        16
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "5": {
+                        "object_data": {
+                            "name": "CAR_5",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        15,
+                                        73,
+                                        30,
+                                        26
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "6": {
+                        "object_data": {
+                            "name": "CAR_6",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        233,
+                                        47,
+                                        30,
+                                        26
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "7": {
+                        "object_data": {
+                            "name": "CAR_7",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        201,
+                                        43,
+                                        39,
+                                        33
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "8": {
+                        "object_data": {
+                            "name": "CAR_8",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        206,
+                                        99,
+                                        66,
+                                        33
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "9": {
+                        "object_data": {
+                            "name": "TRAILER_9",
+                            "type": "TRAILER",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        363,
+                                        67,
+                                        88,
+                                        81
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,64 @@
+{
+    "openlabel": {
+        "metadata": {
+            "schema_version": "1.0.0"
+        },
+        "coordinate_systems": 734,
+        "frames": {
+            "734": {
+                "objects": {
+                    "0": {
+                        "object_data": {
+                            "name": "CAR_0",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        315,
+                                        75,
+                                        60,
+                                        54
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "1": {
+                        "object_data": {
+                            "name": "CAR_1",
+                            "type": "CAR",
+                            "bbox": [
+                                {
+                                    "name": "full_bbox",
+                                    "val": [
+                                        206,
+                                        107,
+                                        97,
+                                        59
+                                    ],
+                                    "attributes": {
+                                        "text": [
+                                            {
+                                                "name": "sensor_id",
+                                                "val": "default_cam"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
