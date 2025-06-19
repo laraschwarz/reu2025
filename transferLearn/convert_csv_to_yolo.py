@@ -10,15 +10,17 @@ os.makedirs(output_label_dir, exist_ok=True)
 
 # === Class Map (update as needed) ===
 CLASS_MAP = {
-    'car': 0,
-    'pickup_truck': 1,
-    'articulated_truck': 2,
-    'bus': 3,
-    'motorcycle': 4,
-    'bicycle': 5,
-    'pedestrian': 6,
-    'traffic_light': 7
+    'pedestrian': 0,
+    'bicycle': 1,
+    'car': 2,
+    'motorcycle': 3,
+    'pickup_truck': 4,
+    'bus': 5,
+    'single_unit_truck': 6,
+    'articulated_truck': 7
 }
+
+
 
 # === Read CSV without headers ===
 df = pd.read_csv(csv_path, header=None)
@@ -26,7 +28,7 @@ df.columns = ['frame', 'object_type', 'xmin', 'ymin', 'xmax', 'ymax']
 
 # === Process Each Frame ===
 for frame_name, group in df.groupby('frame'):
-    image_filename = frame_name + ".jpg"
+    image_filename = f"{int(frame_name):08d}.jpg"
     image_path = os.path.join(image_dir, image_filename)
 
     if not os.path.exists(image_path):
@@ -42,7 +44,7 @@ for frame_name, group in df.groupby('frame'):
 
     label_lines = []
     for _, row in group.iterrows():
-        class_name = row['object_type']
+        class_name = row['object_type'].strip()
         if class_name not in CLASS_MAP:
             continue  # skip unknown classes
 
@@ -59,7 +61,7 @@ for frame_name, group in df.groupby('frame'):
         label_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {box_width:.6f} {box_height:.6f}")
 
     # Write label file
-    label_filename = frame_name + ".txt"
+    label_filename = f"{int(frame_name):08d}.txt"
     label_path = os.path.join(output_label_dir, label_filename)
     with open(label_path, 'w') as f:
         f.write("\n".join(label_lines))
