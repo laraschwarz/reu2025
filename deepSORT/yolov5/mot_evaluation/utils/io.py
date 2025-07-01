@@ -40,16 +40,15 @@ def read_txt_to_struct(fname):
     # change point-size format to two-points format
     data[:, 4:6] += data[:, 2:4]
     return data
-
-
+    
+"""
 def extract_valid_gt_data(all_data, remove_ofv=False):
-    """
     remove non-valid classes. 
     following mot2016 format,
      valid class include [1: pedestrain],
      distractor classes include [2: person on vehicle, 
       7: static person, 8: distractor, 12: reflection].
-    """
+
     distractor_classes = [2, 7, 8, 12]
     valid_classes = [1]
     original = all_data.shape[0]
@@ -90,6 +89,43 @@ def extract_valid_gt_data(all_data, remove_ofv=False):
     cond = np.array([i in distractor_classes for i in all_data[:, 7]])
     selected = np.where(cond == True)[0]
     distractor_ids = np.unique(all_data[selected, 1])
+    return all_data, distractor_ids
+"""
+
+def extract_valid_gt_data(all_data, remove_ofv=False):
+    """
+    remove non-valid classes.
+    following mot2016 format,
+    valid class include [1: pedestrian],
+    distractor classes include [2: person on vehicle,
+     7: static person, 8: distractor, 12: reflection].
+    """
+    distractor_classes = [2, 7, 8, 12]
+    valid_classes     = [1]
+    original          = all_data.shape[0]
+
+    # ensure column 7 is integer class IDs
+    all_data[:, 7] = all_data[:, 7].astype(int)
+
+    # 1) keep only valid + distractor classes
+    valid_mask = np.isin(all_data[:, 7],
+                         valid_classes + distractor_classes)
+    all_data = all_data[valid_mask, :]
+
+    # 2) optionally remove out-of-view boxes
+    if remove_ofv:
+        cx = (all_data[:, 2] + all_data[:, 4]) / 2
+        cy = (all_data[:, 3] + all_data[:, 5]) / 2
+        inview_mask = (cx >= 0) & (cy >= 0)
+        all_data = all_data[inview_mask, :]
+
+    print(f'[GT PREPROCESSING]: Removing non-people classes, remaining '
+          f'{all_data.shape[0]}/{original} boxes')
+
+    # 3) collect distractor IDs
+    distr_mask     = np.isin(all_data[:, 7], distractor_classes)
+    distractor_ids = np.unique(all_data[distr_mask, 1].astype(int))
+
     return all_data, distractor_ids
 
 

@@ -1,0 +1,13 @@
+train: /home/lschwarz/Code/MIO-TCD-Localization/images/train
+val: /home/lschwarz/Code/MIO-TCD-Localization/images/val
+
+nc: 8
+names:
+  - pedestrian
+  - bicycle
+  - car
+  - motorcycle
+  - pickup_truck
+  - bus
+  - single_unit_truck
+  - articulated_truck
