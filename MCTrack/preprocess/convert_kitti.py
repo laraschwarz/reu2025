@@ -318,6 +318,9 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
         for frame_id in tqdm(dets_list):
             frame_name = f"{frame_id:06d}.txt"
             lidar2global = ego_poses[frame_id]
+            #if frame_id in ego_poses:
+            #	lidar2global = ego_poses[frame_id]
+
 
             cameras_transform_matrix = load_camera_info(lidar2camera, camera2image)
             det_path = os.path.join(dets_path, frame_name)

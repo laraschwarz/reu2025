@@ -12,7 +12,7 @@ kitti_cfg = {
     "raw_data_path": "data/kitti/datasets",
     "dets_path": "data/kitti/detectors/",
     "save_path": "data/base_version/kitti/",
-    "detector": "virconv",  # virconv / casa / ... /
+    "detector": "casa",  # virconv / casa / ... /
     "split": "test",  # val / test
 }
 
