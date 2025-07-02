@@ -303,11 +303,28 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
     all_datas = {}
     dataset_path = os.path.join(dataset_root, datset_split)
     detections_path = os.path.join(detections_root, detector, datset_split)
+    
+    #print ids
+    for seq_id in range(all_seqs):
+        scene_name = str(seq_id).zfill(4)
+        dets_path  = os.path.join(detections_path, scene_name)
+        if not os.path.isdir(dets_path):
+            print(f"[skipping] no detection folder for sequence {scene_name} at {dets_path}")
+            continue
+
+        dets_list = sorted(os.listdir(dets_path))
+        if len(dets_list) == 0:
+            print(f"[skipping] detection folder for {scene_name} is empty")
+            continue
+
+    # …rest of your conversion…
+
     for seq_id in tqdm(range(all_seqs)):
         scene_name = str(seq_id).zfill(4)
         dets_path = os.path.join(detections_path, scene_name)
         calib_path = os.path.join(dataset_path, "calib", scene_name + ".txt")
-        pose_path = os.path.join(dataset_path, "pose", scene_name + ".txt")
+        #pose_path = os.path.join(dataset_path, "pose", scene_name + ".txt")
+        pose_path = os.path.join("./data/kitti/datasets/training/pose", scene_name + ".txt")
         dets_list = sorted(os.listdir(dets_path))
         dets_list = [int(re.findall(r"\d+", det)[0]) for det in dets_list]
 
@@ -317,9 +334,11 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
         scene_datas = []
         for frame_id in tqdm(dets_list):
             frame_name = f"{frame_id:06d}.txt"
-            lidar2global = ego_poses[frame_id]
-            #if frame_id in ego_poses:
-            #	lidar2global = ego_poses[frame_id]
+            #lidar2global = ego_poses[frame_id]
+            if frame_id in ego_poses:
+            	lidar2global = ego_poses[frame_id]
+            else:
+                print("skipping " + str(frame_id))
 
 
             cameras_transform_matrix = load_camera_info(lidar2camera, camera2image)
@@ -341,6 +360,7 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
             }
             scene_datas.append(scene_data)
         all_datas[scene_name] = scene_datas
+        
 
     save_path = os.path.join(save_path, detector)
     os.makedirs(save_path, exist_ok=True)
