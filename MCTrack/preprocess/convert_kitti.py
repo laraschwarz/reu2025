@@ -323,8 +323,8 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
         scene_name = str(seq_id).zfill(4)
         dets_path = os.path.join(detections_path, scene_name)
         calib_path = os.path.join(dataset_path, "calib", scene_name + ".txt")
-        #pose_path = os.path.join(dataset_path, "pose", scene_name + ".txt")
-        pose_path = os.path.join("./data/kitti/datasets/training/pose", scene_name + ".txt")
+        pose_path = os.path.join(dataset_path, "pose", scene_name + ".txt")
+        #pose_path = os.path.join("./data/kitti/datasets/training/pose", scene_name + ".txt")
         dets_list = sorted(os.listdir(dets_path))
         dets_list = [int(re.findall(r"\d+", det)[0]) for det in dets_list]
 
@@ -338,7 +338,7 @@ def kitti_main(dataset_root, detections_root, detector, save_path, split):
             if frame_id in ego_poses:
             	lidar2global = ego_poses[frame_id]
             else:
-                print("skipping " + str(frame_id))
+                print(f"[skipping] no detection folder for sequence {scene_name} at {dets_path}")
 
 
             cameras_transform_matrix = load_camera_info(lidar2camera, camera2image)

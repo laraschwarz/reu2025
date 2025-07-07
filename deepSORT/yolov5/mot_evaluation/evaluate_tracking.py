@@ -88,7 +88,10 @@ def preprocessingDB(trackDB, gtDB, distractor_ids, iou_thres, minvis):
     # keep_idx = np.array([i for i in range(gtDB.shape[0]) if gtDB[i, 6] != 0])
     print('[GT PREPROCESSING]: Removing distractor boxes, '
           'remaining {}/{} boxes'.format(len(keep_idx), gtDB.shape[0]))
-    gtDB = gtDB[keep_idx, :]
+    keep_idx = np.array(keep_idx, dtype=int)
+    gtDB     = gtDB[keep_idx, :]
+
+    #gtDB = gtDB[keep_idx, :]
     return trackDB, gtDB
 
 
@@ -245,10 +248,11 @@ def evaluate_tracking(sequences, track_dir, gt_dir):
     for seqname in sequences:
         track_res = os.path.join(track_dir, seqname.split('.')[0] + '.txt')
         gt_file = os.path.join(gt_dir, seqname.split('.')[0] + '.txt')
-        assert os.path.exists(track_res) and os.path.exists(gt_file), \
-            'Either tracking result {} or '\
-            'groundtruth directory {} does not exist'.format(
-                track_res, gt_file)
+        assert os.path.exists(track_res) , \
+            'Tracking result {} does not exist'.format(track_res)
+                
+        assert os.path.exists(gt_file), \
+            'groundtruth directory {} does not exist'.format(gt_file)
 
         trackDB = read_txt_to_struct(track_res)
         gtDB = read_txt_to_struct(gt_file)

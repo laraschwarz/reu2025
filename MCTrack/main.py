@@ -134,7 +134,8 @@ if __name__ == "__main__":
 
     if args.debug:
         if args.dataset == "kitti":
-            scene_lists = [str(scene_id).zfill(4) for scene_id in cfg["TRACKING_SEQS"]]
+            #scene_lists = [str(scene_id).zfill(4) for scene_id in cfg["TRACKING_SEQS"]]
+            scene_lists = ["0000"]
         elif args.dataset == "nuscenes":
             scene_lists = [scene_id for scene_id in data.keys()][:2]
         else:
