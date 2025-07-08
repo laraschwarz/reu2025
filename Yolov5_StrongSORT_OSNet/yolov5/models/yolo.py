@@ -248,6 +248,8 @@ class Model(nn.Module):
                 m.anchor_grid = list(map(fn, m.anchor_grid))
         return self
 
+# for backwards-compatibility with weights saved as DetectionModel
+DetectionModel = Model
 
 def parse_model(d, ch):  # model_dict, input_channels(3)
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")

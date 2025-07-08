@@ -1,3 +1,9 @@
+DETECTOR:
+  WEIGHTS: "yolov5x6-transfer.pt"  # your custom YOLOv5x6 weights
+  IMG_SIZE: 1280                   # make this match whatever you trained / val’d with
+  CONF_THRES: 0.10                 # lower ⇒ more boxes; raise ⇒ fewer boxes
+  IOU_THRES: 0.45                  # NMS overlap threshold (0.3–0.6 is a good sweep range)
+
 STRONGSORT:
   ECC: True              # activate camera motion compensation
   MC_LAMBDA: 0.995       # matching with both appearance (1 - MC_LAMBDA) and motion cost

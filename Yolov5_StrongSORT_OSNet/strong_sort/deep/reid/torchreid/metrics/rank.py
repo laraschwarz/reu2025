@@ -6,12 +6,13 @@ from collections import defaultdict
 try:
     from torchreid.metrics.rank_cylib.rank_cy import evaluate_cy
     IS_CYTHON_AVAI = True
-except ImportError:
+except ImportError as e:
     IS_CYTHON_AVAI = False
     warnings.warn(
         'Cython evaluation (very fast so highly recommended) is '
         'unavailable, now use python evaluation.'
     )
+    print("Error: " + str(e))
 
 
 def eval_cuhk03(distmat, q_pids, g_pids, q_camids, g_camids, max_rank):
