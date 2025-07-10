@@ -12,13 +12,15 @@ LDFLAGS    = -Lonnxruntime-linux-x64-1.22.0/lib \
              $(shell pkg-config --libs opencv4)
 
 SRCS       = main.cpp \
-             yolo_utils.cpp \
-             detector.cpp \
-             multicams.cpp \
-             intersection.cpp \
-             multitracker.cpp \
-             speed_estimator.cpp \
-             track.cpp
+            yolo_utils.cpp \
+            detector.cpp \
+            MultiCams.cpp \
+            Intersection.cpp \
+            Multitracker.cpp \
+            SpeedEstimator.cpp \
+            Track.cpp \
+            HungarianAlg.cpp \
+            Kalman.cpp \
 
 OBJS       = $(SRCS:.cpp=.o)
 TARGET     = accident_detector
