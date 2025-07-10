@@ -51,10 +51,10 @@ YOLODetector::YOLODetector(const std::string& modelPath,
     // inputNames.push_back(session.GetInputName(0, allocator));
     // outputNames.push_back(session.GetOutputName(0, allocator));
     auto input_name_ptrs = session.GetInputNames();
-    inputNames.push_back(input_name_ptrs[0].get());
+    inputNames.push_back(input_name_ptrs[0].c_str());
 
     auto output_name_ptrs = session.GetOutputNames();
-    outputNames.push_back(output_name_ptrs[0].get());
+    outputNames.push_back(output_name_ptrs[0].c_str());
 
     std::cout << "Input name: " << inputNames[0] << std::endl;
     std::cout << "Output name: " << outputNames[0] << std::endl;
