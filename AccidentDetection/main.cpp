@@ -65,7 +65,7 @@ int main(int argc, char** argv)
 	std::string iconPath = "./icons/";
 	std::string classNamesPath = "./data/traffic.names";// cmd.get<std::string>("class_names");
 	std::string GISPath = "GIS_rt130_princeton.xml";// cmd.get<std::string>("image");
-	std::string modelPath = "models/custom2_1280.onnx";// yolov7_5classes_640x640.onnx";// cmd.get<std::string>("model_path");
+	std::string modelPath = "models/yolov5s.onnx";//"models/custom2_1280.onnx";// yolov7_5classes_640x640.onnx";// cmd.get<std::string>("model_path");
 	std::string cameras_file = "cameras.xml";
 
 
