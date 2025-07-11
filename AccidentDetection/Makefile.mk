@@ -8,7 +8,7 @@ CXXFLAGS   = -std=c++17 \
 
 LDFLAGS    = -Lonnxruntime-linux-x64-1.22.0/lib \
              -lonnxruntime \
-             -Wl,-rpath,$$PWD/onnxruntime-linux-x64-1.22.0/lib \
+             -Wl,-rpath,$$PWD/onnxruntime-linux-x64-1.22.0/lib:$$CONDA_PREFIX/lib \
              $(shell pkg-config --libs opencv4)
 
 SRCS       = main.cpp \
