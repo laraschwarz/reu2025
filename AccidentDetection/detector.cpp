@@ -31,6 +31,8 @@ YOLODetector::YOLODetector(const std::string& modelPath,
     session = Ort::Session(env, w_modelPath.c_str(), sessionOptions);
 #else
     session = Ort::Session(env, modelPath.c_str(), sessionOptions);
+
+    
 #endif
 
     Ort::AllocatorWithDefaultOptions allocator;
@@ -50,14 +52,46 @@ YOLODetector::YOLODetector(const std::string& modelPath,
 
     // inputNames.push_back(session.GetInputName(0, allocator));
     // outputNames.push_back(session.GetOutputName(0, allocator));
-    auto input_name_ptrs = session.GetInputNames();
-    inputNames.push_back(input_name_ptrs[0].c_str());
 
-    auto output_name_ptrs = session.GetOutputNames();
-    outputNames.push_back(output_name_ptrs[0].c_str());
+    // auto input_name_ptrs = session.GetInputNames();
+    // inputNames.push_back(input_name_ptrs[0].c_str());
 
-    std::cout << "Input name: " << inputNames[0] << std::endl;
-    std::cout << "Output name: " << outputNames[0] << std::endl;
+    // auto output_name_ptrs = session.GetOutputNames();
+    // outputNames.push_back(output_name_ptrs[0].c_str());
+
+    // std::cout << "Input name: " << inputNames[0] << std::endl;
+    // std::cout << "Output name: " << outputNames[0] << std::endl;
+
+    // --- populate and own the input‐node names ---
+    {
+        // GetInputNames() returns a vector<string>
+        auto tmpInputs = session.GetInputNames();
+        inputNames = tmpInputs; // copy the strings into your member vector
+        inputNamePtrs.clear();
+        inputNamePtrs.reserve(inputNames.size());
+        for (auto &s : inputNames)
+            inputNamePtrs.push_back(s.c_str());
+    }
+
+    // --- populate and own the output‐node names ---
+    {
+        auto tmpOutputs = session.GetOutputNames();
+        outputNames = tmpOutputs; // copy the strings into your member vector
+        outputNamePtrs.clear();
+        outputNamePtrs.reserve(outputNames.size());
+        for (auto &s : outputNames)
+            outputNamePtrs.push_back(s.c_str());
+    }
+
+    // debug print so you can verify at startup
+    std::cout << "Loaded input names (" << inputNamePtrs.size() << "): ";
+    for (auto n : inputNamePtrs)
+        std::cout << n << " ";
+    std::cout << "\n";
+    std::cout << "Loaded output names (" << outputNamePtrs.size() << "): ";
+    for (auto n : outputNamePtrs)
+        std::cout << n << " ";
+    std::cout << "\n";
 
     this->inputImageShape = cv::Size2f(inputSize);
 }
@@ -231,12 +265,27 @@ std::vector<Detection> YOLODetector::detect(cv::Mat& image, const float& confThr
         inputTensorShape.data(), inputTensorShape.size()
         ));
 
-    std::vector<Ort::Value> outputTensors = this->session.Run(Ort::RunOptions{ nullptr },
-        inputNames.data(),
+    // std::vector<Ort::Value> outputTensors = this->session.Run(Ort::RunOptions{ nullptr },
+    //     inputNames.data(),
+    //     inputTensors.data(),
+    //     1,
+    //     outputNames.data(),
+    //     1);
+
+    // guard just in case
+    if (outputNames.empty())
+    {
+        std::cerr << "[YOLODetector] ERROR: no ONNX output names loaded, skipping inference\n";
+        return {};
+    }
+
+    std::vector<Ort::Value> outputTensors = this->session.Run(
+        Ort::RunOptions{nullptr},
+        inputNamePtrs.data(), // <— use the C‑string pointers here
         inputTensors.data(),
-        1,
-        outputNames.data(),
-        1);
+        inputNamePtrs.size(),   // <— exact number of inputs
+        outputNamePtrs.data(),  // <— C‑string pointers for outputs
+        outputNamePtrs.size()); // <— exact number of outputs
 
     cv::Size resizedShape = cv::Size((int)inputTensorShape[3], (int)inputTensorShape[2]);
     std::vector<Detection> result = this->postprocessing(resizedShape,

@@ -1,4 +1,5 @@
 import argparse
+import collections
 
 import os
 # limit the number of cpus used by high performance libraries
@@ -136,6 +137,14 @@ def run(
     # Run tracking
     model.warmup(imgsz=(1 if pt else nr_sources, 3, *imgsz))  # warmup
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
+
+    # Added for tracking first and last coordinates of each track
+    first_coords = {}           # id → list of first up to 5 center‐points
+    last_coords  = {}           # id → deque(maxlen=5) of most recent center‐points
+    final_coords = {}           # id → list of last 5 points at disappearance
+    previous_ids = set()        # ids seen in the prior frame
+
+
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
         t1 = time_sync()
@@ -228,8 +237,11 @@ def run(
                         if save_vid or save_crop or show_vid:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
+                            cx = (output[0] + output[2]) / 2
+                            cy = (output[1] + output[3]) / 2
+
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
+                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {cx:.2f} {cy:.2f} {conf:.2f}'))
                             annotator.box_label(bboxes, label, color=colors(c, True))
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
@@ -264,6 +276,72 @@ def run(
                 vid_writer[i].write(im0)
 
             prev_frames[i] = curr_frames[i]
+
+            # ——— track centers each frame ———
+            current_ids = set()
+            id_to_class = {}      # will map each track ID to its class label
+
+            # If we have any detections for this source:
+            if outputs[i] is not None and len(outputs[i]) > 0:
+                for out in outputs[i]:
+                    tid = int(out[4])
+                    cls=int(out[5])
+                    label = model.names[cls]       # yolov5's .names maps cls IDs → human labels
+                    id_to_class.setdefault(tid, label)
+                    # compute center
+                    cx = (out[0] + out[2]) / 2
+                    cy = (out[1] + out[3]) / 2
+
+                    # init per‐ID storage
+                    if tid not in first_coords:
+                        first_coords[tid] = []
+                        last_coords[tid]  = collections.deque(maxlen=5)
+
+                    # record first five
+                    if len(first_coords[tid]) < 5:
+                        first_coords[tid].append((cx.item(), cy.item()))
+                    # always update last five
+                    last_coords[tid].append((cx.item(), cy.item()))
+
+                    current_ids.add(tid)
+
+            # detect IDs that just disappeared
+            lost = previous_ids - current_ids
+            for tid in lost:
+                # record its last five centers
+                if tid not in final_coords:
+                    final_coords[tid] = list(last_coords[tid])
+            previous_ids = current_ids
+        
+
+    # ——— report ———
+    print("First up to 5 coords per track (ID & class):")
+    for tid, pts in first_coords.items():
+        lbl = id_to_class.get(tid, "unknown")
+        print(f"  ID {tid} ({lbl}): {pts}")
+
+    print("\nLast 5 coords before disappearance (ID & class):")
+    for tid, pts in final_coords.items():
+        lbl = id_to_class.get(tid, "unknown")
+        print(f"  ID {tid} ({lbl}): {pts}")
+
+
+    # after your first_coords and final_coords are populated…
+     # count how many objects crossed from west to east
+    count = 0
+    we = 0
+
+    for tid, start_pts in first_coords.items():
+        # check that we have at least 5 recorded start points
+        if len(start_pts) >= 5 and all(cx < 183 for cx, _ in start_pts):
+            end_pts = final_coords.get(tid, [])
+            # check that we have at least 5 recorded end points
+            if len(end_pts) >= 5 and all(cx > 940 for cx, _ in end_pts):
+                count += 1
+                we.append(tid)  # store the ID of the object that crossed from west to east
+
+    print(f"{count} objects crossed from west to east")
+    print(f"Tracked IDs (west to east): {we}")
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image

@@ -1,6 +1,14 @@
 <?xml version="1.0"?>
 <opencv_storage>
 
+<camera0>"./data/stmarc.avi"</camera0>
+<matrix0>"trans_M_stmarc.xml"</matrix0>
+<camera0_front>0</camera0_front>
+<camera0_roi>roi_stmarc.xml</camera0_roi>
+<camera0_info>"stmarc_intersection"</camera0_info>
+<camera0_h>0</camera0_h>
+<camera0_m>0</camera0_m>
+<camera0_s>0</camera0_s>
 
 <!--<camera0>"../../data/rt130/Rt130_Dutch_south_dilemma_looking_north.mp4"</camera0>
 <matrix0>"trans_M_Rt130_Dutch_south_dilemma_looking_north.xml"</matrix0>
@@ -33,14 +41,14 @@
 <camera0_s>54</camera0_s>
 -->
 
-<!-- <camera0>"../../data/rt130/Rt130_PrincetonHights_south_dilemma_no_jump.mp4"</camera0> -->
-<camera0>"./data/1.mp4"</camera0>
+<!-- <camera0>"../../data/rt130/Rt130_PrincetonHights_south_dilemma_no_jump.mp4"</camera0>
 <matrix0>"trans_M_Rt130_PrincetonHights_south_dilemma.xml"</matrix0>
 <camera0_front>6</camera0_front>
 <camera0_info>"Rt130_PrincetonHights_south_dilemma_zone"</camera0_info>
 <camera0_h>11</camera0_h>
 <camera0_m>21</camera0_m>
-<camera0_s>37</camera0_s>
+<camera0_s>37</camera0_s> -->
+
 
 <!--
 <camera0>"../../data/rt130/Rt130_PrincetonHights_north_dilemma_no_jump.mp4"</camera0>
