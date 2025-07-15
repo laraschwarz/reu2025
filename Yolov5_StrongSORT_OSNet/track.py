@@ -1,6 +1,6 @@
 import argparse
 import collections
-
+from shapely.geometry import Point, Polygon
 import os
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -143,6 +143,13 @@ def run(
     last_coords  = {}           # id → deque(maxlen=5) of most recent center‐points
     final_coords = {}           # id → list of last 5 points at disappearance
     previous_ids = set()        # ids seen in the prior frame
+    # west_box = Polygon([(376, 1224), (0, 945), (0, 304), (850, 683)]) #car lane only box
+    west_box = Polygon([(376, 1224), (0, 945), (0, 55), (1020, 479)])
+    east_box = Polygon([(1911, 845), (1533, 1431), (2561, 1450), (2561, 1210)])
+    # names = model.module.names if hasattr(model, 'module') else model.names
+    names = model.names
+    id_to_class = {}      # will map each track ID to its class label
+
 
 
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
@@ -166,8 +173,6 @@ def run(
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         dt[2] += time_sync() - t3
 
-        names = model.module.names if hasattr(model, 'module') else model.names
-        id_to_class = {}      # will map each track ID to its class label
         
         # Process detections
         for i, det in enumerate(pred):  # detections per image
@@ -283,13 +288,12 @@ def run(
             # ——— track centers each frame ———
             current_ids = set()
 
-
             # If we have any detections for this source:
             if outputs[i] is not None and len(outputs[i]) > 0:
                 for out in outputs[i]:
                     tid = int(out[4])
                     cls_index=int(out[5])
-                    cls_name= names[cls_index] if cls_index < len(names) else 'unknownn'
+                    cls_name= names[cls_index] if cls_index < len(names) else 'unknown'
                     id_to_class[tid] = cls_name  # map track ID to class label
                     # compute center
                     cx = (out[0] + out[2]) / 2
@@ -336,13 +340,13 @@ def run(
 
     for tid, start_pts in first_coords.items():
         # check that we have at least 5 recorded start points
-        if len(start_pts) >= 5 and all(cx < 190 for cx, _ in start_pts):
+        if len(start_pts) >= 5 and all(west_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
             end_pts = final_coords.get(tid, [])
             # check that we have at least 5 recorded end points
-            if len(end_pts) >= 5 and all(cx > 890 for cx, _ in end_pts):
+            if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts):
                 count += 1
-                we.append(tid)  # store the ID of the object that crossed from west to east
-
+                we.append(tid)
+                
     print(f"{count} objects crossed from west to east")
     print(f"Tracked IDs (west to east): {we}")
 
