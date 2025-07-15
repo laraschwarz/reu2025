@@ -140,9 +140,7 @@ def run(
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
 
     # Added for tracking first and last coordinates of each track
-    first_coords = {}           # id → list of first up to 5 center‐points
-    last_coords  = {}           # id → deque(maxlen=5) of most recent center‐points
-    final_coords = {}           # id → list of last 5 points at disappearance
+    coords = {}      # id → list of coordinates
     previous_ids = set()        # ids seen in the prior frame
     # west_box = Polygon([(376, 1224), (0, 945), (0, 304), (850, 683)]) #car lane only box
     # orig_west = [(376, 1224), (0, 945), (0, 55), (1020, 479)]
@@ -365,65 +363,33 @@ def run(
                     cy = (out[1] + out[3]) / 2
 
                     # init per‐ID storage
-                    if tid not in first_coords:
-                        first_coords[tid] = []
-                        last_coords[tid]  = collections.deque(maxlen=5)
+                    if tid not in coords:
+                        coords[tid] = []
 
-                    # record first five
-                    if len(first_coords[tid]) < 5:
-                        first_coords[tid].append((cx.item(), cy.item()))
-                    # always update last five
-                    last_coords[tid].append((cx.item(), cy.item()))
-
+                    coords[tid].append((cx.item(), cy.item()))
                     current_ids.add(tid)
 
             # detect IDs that just disappeared
             lost = previous_ids - current_ids
-            for tid in lost:
-                # record its last five centers
-                if tid not in final_coords:
-                    final_coords[tid] = list(last_coords[tid])
             previous_ids = current_ids
 
             # count how many objects crossed from west to east
             
-            for tid, start_pts in first_coords.items():
-                # check that we have at least 5 recorded start points
-                if len(start_pts) >= 5 and all(west_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
-                    end_pts = final_coords.get(tid, [])
-                    # check that we have at least 5 recorded end points
-                    if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in we:
+            for tid, points in coords.items():
+                if tid in lost and len(points) > 10:  # if the track has disappeared
+                    path_taken = "W-->E" if lcss(we_path, points, eps=10.0) > 0.5 else "N-->S" if lcss(ns_path, points, eps=10.0) > 0.5 else "unknown"
+                    if not path_taken == "unknown":
                         count += 1
-                        we.append(tid)
-                        msg = f"{id_to_class[tid]} ({tid}) crossed W-->E"
+                        we.append(tid) if path_taken == "W-->E" else ns.append(tid) if path_taken == "N-->S" else None
+                        msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
                         cross_display.append(msg) # message to display on video
-                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from west to east\n\n')
-                if len(start_pts) >= 5 and all(north_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
-                    end_pts = final_coords.get(tid, [])
-                    # check that we have at least 5 recorded end points
-                    if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in ne:
-                        count += 1
-                        ne.append(tid)
-                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') turned from north to east\n\n')
-                if len(start_pts) >= 5 and all(north_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
-                    end_pts = final_coords.get(tid, [])
-                    # check that we have at least 5 recorded end points
-                    if len(end_pts) >= 5 and all(south_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in ns:
-                        count += 1
-                        ns.append(tid)
-                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from north to south\n\n')
-        
+                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from {path_taken}\n\n')
+                    if id_to_class[tid] == 'car':
+                        print(f"lcss_we: {lcss(we_path, points, eps=10.0)}, lcss_ns: {lcss(ns_path, points, eps=10.0)}, points: {points}\n\n")
+
+                
 
     # ——— report ———
-    print("First up to 5 coords per track (ID & class):")
-    for tid, pts in first_coords.items():
-        lbl = id_to_class.get(tid)
-        print(f"  ID {tid} ({lbl}): {pts}")
-
-    print("\nLast 5 coords before disappearance (ID & class):")
-    for tid, pts in final_coords.items():
-        lbl = id_to_class.get(tid)
-        print(f"  ID {tid} ({lbl}): {pts}")
 
     print(f"{len(we)} objects crossed from west to east")
     print(f"{len(ne)} objects turned from north to east")
