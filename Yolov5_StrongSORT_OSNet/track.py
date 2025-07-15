@@ -166,6 +166,9 @@ def run(
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         dt[2] += time_sync() - t3
 
+        names = model.module.names if hasattr(model, 'module') else model.names
+        id_to_class = {}      # will map each track ID to its class label
+        
         # Process detections
         for i, det in enumerate(pred):  # detections per image
             seen += 1
@@ -279,15 +282,15 @@ def run(
 
             # ——— track centers each frame ———
             current_ids = set()
-            id_to_class = {}      # will map each track ID to its class label
+
 
             # If we have any detections for this source:
             if outputs[i] is not None and len(outputs[i]) > 0:
                 for out in outputs[i]:
                     tid = int(out[4])
-                    cls=int(out[5])
-                    label = model.names[cls]       # yolov5's .names maps cls IDs → human labels
-                    id_to_class.setdefault(tid, label)
+                    cls_index=int(out[5])
+                    cls_name= names[cls_index] if cls_index < len(names) else 'unknownn'
+                    id_to_class[tid] = cls_name  # map track ID to class label
                     # compute center
                     cx = (out[0] + out[2]) / 2
                     cy = (out[1] + out[3]) / 2
@@ -317,26 +320,26 @@ def run(
     # ——— report ———
     print("First up to 5 coords per track (ID & class):")
     for tid, pts in first_coords.items():
-        lbl = id_to_class.get(tid, "unknown")
+        lbl = id_to_class.get(tid)
         print(f"  ID {tid} ({lbl}): {pts}")
 
     print("\nLast 5 coords before disappearance (ID & class):")
     for tid, pts in final_coords.items():
-        lbl = id_to_class.get(tid, "unknown")
+        lbl = id_to_class.get(tid)
         print(f"  ID {tid} ({lbl}): {pts}")
 
 
     # after your first_coords and final_coords are populated…
      # count how many objects crossed from west to east
     count = 0
-    we = 0
+    we = []
 
     for tid, start_pts in first_coords.items():
         # check that we have at least 5 recorded start points
-        if len(start_pts) >= 5 and all(cx < 183 for cx, _ in start_pts):
+        if len(start_pts) >= 5 and all(cx < 190 for cx, _ in start_pts):
             end_pts = final_coords.get(tid, [])
             # check that we have at least 5 recorded end points
-            if len(end_pts) >= 5 and all(cx > 940 for cx, _ in end_pts):
+            if len(end_pts) >= 5 and all(cx > 890 for cx, _ in end_pts):
                 count += 1
                 we.append(tid)  # store the ID of the object that crossed from west to east
 
