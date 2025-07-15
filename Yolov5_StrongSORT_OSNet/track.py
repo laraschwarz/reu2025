@@ -165,12 +165,20 @@ def run(
 
     west_box = Polygon([(376, 1224), (0, 945), (0, 55), (1020, 479)])
     east_box = Polygon([(1911, 845), (1533, 1431), (2561, 1450), (2561, 1210)])
+    north_box = Polygon([(1050, 460), (1443, 0), (2400, 0), (1900, 845)])
+    south_box = Polygon([(707, 1440), (355, 1440), (259, 1370), (382, 1234)])
 
     # names = model.module.names if hasattr(model, 'module') else model.names
     names = model.names
     id_to_class = {}      # will map each track ID to its class label
 
+    # count how many objects crossed from west to east
+    count = 0
+    we = [] # west to east
+    ne = [] # north to east
+    ns = [] # north to south
 
+    cross_display = [] # messages to display on video
 
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -217,7 +225,7 @@ def run(
             curr_frames[i] = im0
 
             txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
+            s += '%gx%g ' % im.shape[2:]  # print image dimensions
             imc = im0.copy() if save_crop else im0  # for save_crop
 
             annotator = Annotator(im0, line_width=2, pil=not ascii)
@@ -231,7 +239,7 @@ def run(
                 # Print results
                 for c in det[:, -1].unique():
                     n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add object count and name to string
 
                 xywhs = xyxy2xywh(det[:, 0:4])
                 confs = det[:, 4]
@@ -275,12 +283,37 @@ def run(
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
-                LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)')
+                if (frame_idx + 1) % 10 == 0:
+                    LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)') # print s and timing info every 10 frames
+                
+
 
             else:
                 strongsort_list[i].increment_ages()
                 LOGGER.info('No detections')
 
+            font        = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale  = 0.5
+            thickness   = 1
+            padding     = 2    # px of padding around the text
+            bg_color    = (0, 0, 0)
+            text_color  = (0, 0, 255)
+            for i, text in enumerate(cross_display):
+                (w, h), base = cv2.getTextSize(text, font, font_scale, thickness)
+                x, y = 10, 30 + i * 30
+                tl = (x - padding, y - h - base - padding)
+                br = (x + w + padding, y + base + padding)
+                cv2.rectangle(im0, tl, br, (255, 255, 255), cv2.FILLED)
+                cv2.putText(
+                    im0,                  # draw onto this image
+                    text,                 # the string to draw
+                    (x, y),              # bottom‐left corner of text (x, y)
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    font_scale,           # font scale
+                    text_color,          # color = red (B, G, R)
+                    thickness,            # line thickness
+                    cv2.LINE_AA
+                )
             # Stream results
             im0 = annotator.result()
             if show_vid:
@@ -339,6 +372,41 @@ def run(
                 if tid not in final_coords:
                     final_coords[tid] = list(last_coords[tid])
             previous_ids = current_ids
+
+            # count how many objects crossed from west to east
+            
+            for tid, start_pts in first_coords.items():
+                # check that we have at least 5 recorded start points
+                if len(start_pts) >= 5 and all(west_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
+                    end_pts = final_coords.get(tid, [])
+                    # check that we have at least 5 recorded end points
+                    if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in we:
+                        count += 1
+                        we.append(tid)
+                        msg = f"{id_to_class[tid]} ({tid}) crossed W-->E"
+                        cross_display.append(msg) # message to display on video
+                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from west to east\n\n')
+                if len(start_pts) >= 5 and all(north_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
+                    end_pts = final_coords.get(tid, [])
+                    # check that we have at least 5 recorded end points
+                    if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in ne:
+                        count += 1
+                        ne.append(tid)
+                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') turned from north to east\n\n')
+                if len(start_pts) >= 5 and all(north_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
+                    end_pts = final_coords.get(tid, [])
+                    # check that we have at least 5 recorded end points
+                    if len(end_pts) >= 5 and all(south_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts) and not tid in ns:
+                        count += 1
+                        ns.append(tid)
+                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from north to south\n\n')
+
+    print(f"{len(we)} objects crossed from west to east")
+    print(f"{len(ne)} objects turned from north to east")
+    print(f"{len(ns)} objects crossed from north to south")
+    print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
+    print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
+    print(f"Tracked IDs (north to south): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ns]}")
         
 
     # ——— report ———
@@ -353,22 +421,7 @@ def run(
         print(f"  ID {tid} ({lbl}): {pts}")
 
 
-    # after your first_coords and final_coords are populated…
-     # count how many objects crossed from west to east
-    count = 0
-    we = []
-
-    for tid, start_pts in first_coords.items():
-        # check that we have at least 5 recorded start points
-        if len(start_pts) >= 5 and all(west_box.contains(Point(cx*2,cy*2)) for cx, cy in start_pts):
-            end_pts = final_coords.get(tid, [])
-            # check that we have at least 5 recorded end points
-            if len(end_pts) >= 5 and all(east_box.contains(Point(cx*2,cy*2)) for cx, cy in end_pts):
-                count += 1
-                we.append(tid)
-                
-    print(f"{count} objects crossed from west to east")
-    print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
+    
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
