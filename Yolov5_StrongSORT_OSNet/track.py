@@ -2,6 +2,7 @@ import argparse
 import collections
 from shapely.geometry import Point, Polygon
 import os
+from tslearn.metrics import lcss
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -180,6 +181,8 @@ def run(
 
     cross_display = [] # messages to display on video
 
+    we_path =[] # base path for objects that cross from west to east
+
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
         t1 = time_sync()
@@ -259,6 +262,7 @@ def run(
                         id = output[4]
                         cls = output[5]
 
+
                         if save_txt:
                             # to MOT format
                             bbox_left = output[0]
@@ -276,6 +280,9 @@ def run(
                             cx = (output[0] + output[2]) / 2
                             cy = (output[1] + output[3]) / 2
 
+                            if(id==10):
+                                we_path.append((cx, cy))
+
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
                                 (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {cx:.2f} {cy:.2f} {conf:.2f}'))
                             annotator.box_label(bboxes, label, color=colors(c, True))
@@ -283,6 +290,7 @@ def run(
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
+                
                 if (frame_idx + 1) % 10 == 0:
                     LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)') # print s and timing info every 10 frames
                 
@@ -298,9 +306,9 @@ def run(
             padding     = 2    # px of padding around the text
             bg_color    = (0, 0, 0)
             text_color  = (0, 0, 255)
-            for i, text in enumerate(cross_display):
+            for j, text in enumerate(cross_display):
                 (w, h), base = cv2.getTextSize(text, font, font_scale, thickness)
-                x, y = 10, 30 + i * 30
+                x, y = 10, 30 + j * 30
                 tl = (x - padding, y - h - base - padding)
                 br = (x + w + padding, y + base + padding)
                 cv2.rectangle(im0, tl, br, (255, 255, 255), cv2.FILLED)
@@ -400,13 +408,6 @@ def run(
                         count += 1
                         ns.append(tid)
                         print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from north to south\n\n')
-
-    print(f"{len(we)} objects crossed from west to east")
-    print(f"{len(ne)} objects turned from north to east")
-    print(f"{len(ns)} objects crossed from north to south")
-    print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
-    print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
-    print(f"Tracked IDs (north to south): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ns]}")
         
 
     # ——— report ———
@@ -420,7 +421,14 @@ def run(
         lbl = id_to_class.get(tid)
         print(f"  ID {tid} ({lbl}): {pts}")
 
+    print(f"{len(we)} objects crossed from west to east")
+    print(f"{len(ne)} objects turned from north to east")
+    print(f"{len(ns)} objects crossed from north to south")
+    print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
+    print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
+    print(f"Tracked IDs (north to south): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ns]}")
 
+    print(f"we_path: {we_path}")
     
 
     # Print results
