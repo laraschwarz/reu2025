@@ -144,8 +144,28 @@ def run(
     final_coords = {}           # id → list of last 5 points at disappearance
     previous_ids = set()        # ids seen in the prior frame
     # west_box = Polygon([(376, 1224), (0, 945), (0, 304), (850, 683)]) #car lane only box
+    # orig_west = [(376, 1224), (0, 945), (0, 55), (1020, 479)]
+    # orig_east = [(1911, 845), (1533, 1450), (2561, 1450), (2561, 1210)]
+    # cap = cv2.VideoCapture('trimmed_stmarc.mp4')
+    # if not cap.isOpened():
+    #     print(f"Error: could not open {'trimmed_stmarc.mp4'}")
+    #     return
+    # ret, frame = cap.read()
+    # h, w = frame.shape[:2]
+
+    # # If polygons were defined on a different resolution,
+    # scale_x = w  / 2561
+    # scale_y = h  / 1450
+
+    # west_points = [(int(x * scale_x), int(y * scale_y)) for x, y in orig_west]
+    # east_points = [(int(x * scale_x), int(y * scale_y)) for x, y in orig_east]
+
+    # west_box = Polygon(west_points)
+    # east_box = Polygon(east_points)
+
     west_box = Polygon([(376, 1224), (0, 945), (0, 55), (1020, 479)])
     east_box = Polygon([(1911, 845), (1533, 1431), (2561, 1450), (2561, 1210)])
+
     # names = model.module.names if hasattr(model, 'module') else model.names
     names = model.names
     id_to_class = {}      # will map each track ID to its class label
@@ -348,7 +368,7 @@ def run(
                 we.append(tid)
                 
     print(f"{count} objects crossed from west to east")
-    print(f"Tracked IDs (west to east): {we}")
+    print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
