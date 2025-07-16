@@ -11,8 +11,8 @@ ns_path_diff = np.diff(np.array(ns_path), axis=0)
 car_10_points_diff = np.diff(np.array(car_10_points), axis=0)
 
 
-print("WE " + str(lcss(we_path, car_10_points, eps=10.0)))
-print("NS " + str(lcss(ns_path, car_10_points, eps=10.0))+"\n")
+print("WE " + str(lcss(we_path, car_10_points, eps=15.0)))
+print("NS " + str(lcss(ns_path, car_10_points, eps=15.0))+"\n")
 
-print("WE " + str(lcss(we_path_diff, car_10_points_diff, eps=10.0)))
-print("NS " + str(lcss(ns_path_diff, car_10_points_diff, eps=10.0))) 
+print("WE " + str(lcss(we_path_diff, car_10_points_diff, eps=15.0)))
+print("NS " + str(lcss(ns_path_diff, car_10_points_diff, eps=15.0))) 
