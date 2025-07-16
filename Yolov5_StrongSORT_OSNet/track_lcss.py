@@ -91,7 +91,7 @@ def run(
         exp_name = 'ensemble'
     exp_name = name if name else exp_name + "_" + strong_sort_weights.stem
     save_dir = increment_path(Path(project) / exp_name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'tracks' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    (save_dir / 'tracks' if save_txt else save_dir).mkdir(parents=True, exist_ok=True) if save_vid or save_txt else None # make dir
 
     # Load model
     device = select_device(device)
@@ -142,25 +142,9 @@ def run(
     # Added for tracking first and last coordinates of each track
     coords = {}      # id → list of coordinates
     previous_ids = set()        # ids seen in the prior frame
-    # west_box = Polygon([(376, 1224), (0, 945), (0, 304), (850, 683)]) #car lane only box
-    # orig_west = [(376, 1224), (0, 945), (0, 55), (1020, 479)]
-    # orig_east = [(1911, 845), (1533, 1450), (2561, 1450), (2561, 1210)]
-    # cap = cv2.VideoCapture('trimmed_stmarc.mp4')
-    # if not cap.isOpened():
-    #     print(f"Error: could not open {'trimmed_stmarc.mp4'}")
-    #     return
-    # ret, frame = cap.read()
-    # h, w = frame.shape[:2]
-
-    # # If polygons were defined on a different resolution,
-    # scale_x = w  / 2561
-    # scale_y = h  / 1450
-
-    # west_points = [(int(x * scale_x), int(y * scale_y)) for x, y in orig_west]
-    # east_points = [(int(x * scale_x), int(y * scale_y)) for x, y in orig_east]
-
-    # west_box = Polygon(west_points)
-    # east_box = Polygon(east_points)
+    crossed_ids = set()        # ids that crossed the intersection
+    car88_points = {}  
+    car88_lcss = {}
 
     west_box = Polygon([(376, 1224), (0, 945), (0, 55), (1020, 479)])
     east_box = Polygon([(1911, 845), (1533, 1431), (2561, 1450), (2561, 1210)])
@@ -181,7 +165,8 @@ def run(
 
     # base path for objects that cross from west to east, based on car ID:10
     we_path = [(39.5, 229.0), (45.5, 232.0), (52.0, 236.5), (59.5, 242.5), (66.5, 250.0), (73.5, 256.0), (83.5, 264.5), (98.0, 271.5), (111.5, 280.5), (126.5, 287.5), (140.0, 293.5), (155.0, 301.5), (170.0, 308.0), (183.5, 316.0), (200.0, 324.5), (213.5, 332.5), (230.5, 340.0), (246.0, 349.5), (262.0, 357.0), (277.0, 364.5), (293.0, 372.5), (307.0, 381.0), (325.0, 390.0), (342.0, 399.0), (358.0, 407.5), (375.5, 416.0), (392.0, 425.0), (408.5, 432.0), (426.5, 441.5), (441.5, 450.5), (460.5, 459.0), (478.0, 467.5), (496.0, 476.5), (513.5, 486.5), (532.0, 495.0), (550.0, 505.0), (568.0, 515.0), (587.5, 523.5), (606.0, 535.0), (625.5, 544.5), (644.5, 555.0), (664.5, 565.5), (684.0, 575.0), (704.0, 586.0), (724.5, 596.0), (745.5, 608.5), (766.0, 619.0), (787.0, 629.5), (808.5, 641.0), (831.5, 646.5), (853.0, 651.0), (874.5, 656.0), (897.5, 663.0), (918.5, 669.0), (923.5, 675.0), (948.0, 680.5), (962.0, 686.5), (970.5, 692.5), (986.5, 698.0), (1002.0, 705.0), (1019.5, 711.5)]
-    ns_path = [(981.5, 30.0), (976.5, 37.0), (973.0, 43.5), (963.0, 51.0), (955.0, 57.0), (937.5, 71.5), (927.5, 84.5), (917.0, 99.5), (899.0, 127.5), (888.5, 142.5), (878.0, 155.0), (858.0, 184.5), (836.0, 214.5), (816.0, 244.5), (806.0, 259.5), (782.0, 290.5), (771.0, 307.5), (758.5, 323.5), (700.0, 406.5), (662.5, 459.5), (637.0, 496.0), (625.0, 513.5), (596.5, 551.5), (583.5, 570.5), (569.5, 590.5), (555.5, 610.5), (540.5, 623.0), (527.5, 633.0), (515.0, 642.0), (508.0, 652.0), (498.5, 662.5), (491.5, 672.0), (484.5, 683.0), (476.0, 693.0), (465.5, 703.5)]
+    # ns_path = [(981.5, 30.0), (976.5, 37.0), (973.0, 43.5), (963.0, 51.0), (955.0, 57.0), (937.5, 71.5), (927.5, 84.5), (917.0, 99.5), (899.0, 127.5), (888.5, 142.5), (878.0, 155.0), (858.0, 184.5), (836.0, 214.5), (816.0, 244.5), (806.0, 259.5), (782.0, 290.5), (771.0, 307.5), (758.5, 323.5), (700.0, 406.5), (662.5, 459.5), (637.0, 496.0), (625.0, 513.5), (596.5, 551.5), (583.5, 570.5), (569.5, 590.5), (555.5, 610.5), (540.5, 623.0), (527.5, 633.0), (515.0, 642.0), (508.0, 652.0), (498.5, 662.5), (491.5, 672.0), (484.5, 683.0), (476.0, 693.0), (465.5, 703.5)]
+    ns_path = [(890.0, 8.5), (889.5, 9.0), (889.0, 9.0), (888.5, 9.0), (888.5, 9.5), (888.5, 9.5), (887.0, 10.0), (886.0, 10.5), (886.0, 11.0), (886.0, 11.5), (885.5, 11.5), (885.0, 11.5), (885.0, 12.0), (885.0, 12.0), (884.5, 12.5), (884.0, 12.5), (883.5, 13.0), (883.0, 13.0), (883.0, 13.5), (882.0, 13.5), (881.5, 13.5), (881.0, 14.0), (879.5, 14.5), (879.0, 15.0), (878.5, 15.0), (878.0, 15.0), (877.0, 15.5), (877.5, 16.0), (877.0, 16.0), (876.5, 16.5), (875.5, 17.0), (876.0, 17.5), (875.5, 18.0), (874.5, 18.0), (874.0, 18.5), (874.0, 19.0), (874.0, 19.5), (873.5, 20.0), (872.0, 21.0), (871.5, 21.5), (870.5, 22.0), (870.5, 22.5), (869.5, 23.5), (869.5, 24.0), (867.0, 24.5), (865.5, 25.5), (866.0, 26.5), (866.0, 27.5), (867.0, 28.5), (868.0, 28.5), (866.5, 29.0), (866.0, 29.5), (866.0, 30.0), (865.5, 31.0), (865.0, 31.5), (865.0, 32.0), (865.5, 33.0), (864.5, 34.0), (863.0, 35.0), (863.5, 36.0), (866.5, 36.5), (868.0, 37.0), (866.5, 37.5), (865.0, 38.0), (864.0, 39.0), (863.5, 40.0), (862.5, 40.5), (861.0, 41.5), (859.5, 42.5), (857.0, 44.0), (856.5, 45.0), (855.0, 45.5), (854.5, 46.5), (853.5, 47.5), (852.0, 48.5), (850.5, 50.0), (849.5, 51.0), (848.0, 52.0), (846.5, 53.0), (844.5, 53.5), (843.5, 54.0), (842.0, 55.0), (841.0, 56.0), (839.5, 57.0), (837.5, 58.5), (836.0, 60.0), (834.5, 61.0), (832.5, 62.5), (830.5, 63.5), (828.5, 66.0), (826.5, 66.5), (825.5, 67.5), (823.5, 68.5), (821.0, 69.0), (819.0, 70.5), (817.0, 71.5), (815.0, 72.5), (813.5, 74.0), (811.0, 75.5), (810.5, 77.5), (808.5, 79.0), (806.0, 82.0), (804.0, 85.5), (802.5, 88.5), (800.5, 91.5), (798.5, 93.5), (795.5, 95.5), (794.5, 98.0), (791.5, 101.0), (790.0, 103.5), (787.5, 106.0), (785.0, 108.5), (783.0, 111.0), (781.0, 113.5), (780.0, 117.0), (777.0, 120.0), (774.0, 123.0), (771.0, 125.0), (768.5, 128.0), (765.0, 131.0), (763.0, 133.5), (761.5, 136.5), (759.5, 139.0), (757.5, 142.0), (755.5, 144.5), (754.0, 147.5), (751.0, 151.0), (748.0, 154.0), (747.5, 157.5), (744.5, 160.0), (742.5, 162.5), (740.0, 166.5), (737.0, 170.0), (733.5, 173.0), (730.0, 176.5), (728.0, 179.5), (725.0, 183.5), (722.5, 186.5), (720.5, 189.5), (718.0, 192.0), (714.5, 195.5), (711.5, 198.5), (707.5, 202.5), (705.0, 207.0), (702.5, 210.5), (700.5, 214.5), (696.5, 218.0), (694.5, 221.5), (691.5, 225.0), (688.5, 230.0), (685.0, 233.5), (682.0, 237.5), (678.5, 241.0), (675.5, 245.5), (672.0, 249.5), (668.5, 253.5), (665.0, 258.0), (661.0, 265.0), (659.0, 268.0), (654.5, 272.5), (651.0, 276.0), (647.0, 279.5), (643.5, 284.0), (639.5, 288.5), (635.5, 293.5), (631.0, 298.5), (628.0, 304.5), (625.0, 309.5), (621.5, 314.0), (616.5, 318.5), (613.0, 322.5), (608.5, 328.0), (605.0, 334.0), (601.5, 339.0), (598.0, 343.5), (593.0, 347.5), (589.5, 353.0), (584.5, 358.0), (579.0, 366.0), (574.0, 371.5), (571.5, 376.0), (567.0, 381.0), (561.5, 386.5), (558.5, 392.5), (553.5, 398.0), (547.5, 404.5), (543.0, 410.5), (539.5, 417.0), (534.5, 423.5), (529.0, 428.0), (525.0, 433.5), (520.0, 441.0), (514.0, 447.0), (509.5, 454.0), (504.5, 460.0), (499.0, 465.5), (494.0, 472.5), (489.0, 480.0), (483.5, 486.5), (478.0, 494.0), (473.0, 500.5), (467.5, 508.5), (461.5, 515.5), (455.0, 521.5), (450.5, 529.5), (444.5, 537.0), (438.0, 545.0), (432.0, 552.0), (426.0, 559.5), (420.5, 567.5), (414.5, 576.0), (408.0, 583.0), (402.0, 591.0), (395.0, 599.5), (389.5, 607.5), (383.0, 614.5), (377.0, 619.5), (370.0, 623.0), (364.0, 627.5), (356.5, 631.5), (350.0, 636.0), (346.0, 640.0), (341.0, 644.5), (338.5, 649.5), (333.5, 653.0), (330.5, 657.5), (325.0, 662.0), (322.5, 666.0), (317.5, 670.5), (313.0, 675.5), (309.5, 681.0), (305.5, 686.0), (303.5, 690.5), (299.5, 695.5)]
 
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -280,21 +265,21 @@ def run(
                             cx = (output[0] + output[2]) / 2
                             cy = (output[1] + output[3]) / 2
 
-                            if(id==10):
-                                we_path.append((cx, cy))
-                            if(id==12):
-                                ns_path.append((cx, cy))
+                            # if(id==10):
+                            #     we_path.append((cx, cy))
+                            # if(id==12):
+                            #     ns_path.append((cx, cy))
 
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {cx:.2f} {cy:.2f} {conf:.2f}'))
+                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
                             annotator.box_label(bboxes, label, color=colors(c, True))
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
                 
-                if (frame_idx + 1) % 10 == 0:
-                    LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)') # print s and timing info every 10 frames
+                # if (frame_idx + 1) % 10 == 0:
+                    # LOGGER.info(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)') # print s and timing info every 10 frames
                 
 
 
@@ -302,6 +287,7 @@ def run(
                 strongsort_list[i].increment_ages()
                 LOGGER.info('No detections')
 
+            # Display crossing information on the video
             font        = cv2.FONT_HERSHEY_SIMPLEX
             font_scale  = 0.5
             thickness   = 1
@@ -366,7 +352,8 @@ def run(
                     if tid not in coords:
                         coords[tid] = []
 
-                    coords[tid].append((cx.item(), cy.item()))
+                    if (cx.item(), cy.item()) not in coords[tid]:
+                        coords[tid].append((cx.item(), cy.item())) # only add if not already present (e.g. if car is stopped)
                     current_ids.add(tid)
 
             # detect IDs that just disappeared
@@ -376,31 +363,31 @@ def run(
             # count how many objects crossed from west to east
             
             for tid, points in coords.items():
-                if tid in lost and len(points) > 10:  # if the track has disappeared
-                    path_taken = "W-->E" if lcss(we_path, points, eps=10.0) > 0.5 else "N-->S" if lcss(ns_path, points, eps=10.0) > 0.5 else "unknown"
-                    if not path_taken == "unknown":
+                # if tid in lost and (id_to_class[tid]=="person" and len(points) > 50 or id_to_class[tid]=="car" and len(points) > 20):  # if the track has disappeared
+                if tid in lost and id_to_class[tid]=="car" and len(points) > 20:  # if the track has disappeared
+                    path_taken = "W-->E" if lcss(we_path, points, eps=60.0) > 0.5 else "N-->S" if lcss(ns_path, points, eps=60.0) > 0.5 else "unknown"
+                    if not path_taken == "unknown" and tid not in crossed_ids:
                         count += 1
+                        crossed_ids.add(tid)
                         we.append(tid) if path_taken == "W-->E" else ns.append(tid) if path_taken == "N-->S" else None
                         msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
                         cross_display.append(msg) # message to display on video
-                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ') crossed from {path_taken}\n\n')
-                    if id_to_class[tid] == 'car':
-                        print(f"lcss_we: {lcss(we_path, points, eps=10.0)}, lcss_ns: {lcss(ns_path, points, eps=10.0)}, points: {points}\n\n")
+                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
 
-                
+                    print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss(we_path, points, eps=50.0)}, lcss_ns: {lcss(ns_path, points, eps=50.0)}, points: {points}\n\n")
+                    # car88_points = points if tid == 88 else car88_points
+                    # car88_lcss[tid] = (lcss(we_path, points, eps=50.0), lcss(ns_path, points, eps=50.0))
 
     # ——— report ———
 
     print(f"{len(we)} objects crossed from west to east")
-    print(f"{len(ne)} objects turned from north to east")
+    # print(f"{len(ne)} objects turned from north to east")
     print(f"{len(ns)} objects crossed from north to south")
     print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
-    print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
+    # print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
     print(f"Tracked IDs (north to south): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ns]}")
-
-    # print(f"we_path: {we_path}")
-    # pure = [(float(a), float(b)) for a, b in ns_path]
-    # print(f"ns_path: {pure}")
+    print(f"88 points: {car88_points}")
+    print(f"88 LCSS: {car88_lcss}")
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
