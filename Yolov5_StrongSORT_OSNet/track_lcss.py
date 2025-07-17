@@ -143,17 +143,10 @@ def run(
     coords = {}      # id → list of coordinates
     previous_ids = set()        # ids seen in the prior frame
     crossed_ids = set()        # ids that crossed the intersection
-    car88_points = {}  
-    car88_lcss = {}
-
-    west_box = Polygon([(376, 1224), (0, 945), (0, 55), (1020, 479)])
-    east_box = Polygon([(1911, 845), (1533, 1431), (2561, 1450), (2561, 1210)])
-    north_box = Polygon([(1050, 460), (1443, 0), (2400, 0), (1900, 845)])
-    south_box = Polygon([(707, 1440), (355, 1440), (259, 1370), (382, 1234)])
-
-    # names = model.module.names if hasattr(model, 'module') else model.names
     names = model.names
     id_to_class = {}      # will map each track ID to its class label
+    ids_per_frame = []  # will map each frame to the set of IDs seen in that frame
+    recent_ids = []  # will store the IDs seen in the last 5 frames
 
     # count how many objects crossed from west to east
     count = 0
@@ -360,25 +353,28 @@ def run(
             # detect IDs that just disappeared
             lost = previous_ids - current_ids
             previous_ids = current_ids
+            ids_per_frame.append(current_ids)  # store IDs seen in this frame
 
             # count how many objects crossed from west to east
             
             for tid, points in coords.items():
                 # if tid in lost and (id_to_class[tid]=="person" and len(points) > 50 or id_to_class[tid]=="car" and len(points) > 20):  # if the track has disappeared
-                if tid in lost and id_to_class[tid]=="car" and len(points) > 20:  # if the track has disappeared
-                    points_diff = np.diff(np.array(points), axis=0) # compute differences between consecutive points (accounts for parallel paths)
-                    # path_taken = "W-->E" if lcss(we_path, points, eps=60.0) > 0.5 else "N-->S" if lcss(ns_path, points, eps=60.0) > 0.5 else "unknown"
-                    path_taken = "W-->E" if lcss(we_path_diff, points_diff, eps=15.0) > 0.5 else "N-->S" if lcss(ns_path_diff, points_diff, eps=15.0) > 0.5 else "unknown"
-                    if not path_taken == "unknown" and tid not in crossed_ids:
-                        count += 1
-                        crossed_ids.add(tid)
-                        we.append(tid) if path_taken == "W-->E" else ns.append(tid) if path_taken == "N-->S" else None
-                        msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
-                        cross_display.append(msg) # message to display on video
-                        print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
+                recent_ids = ids_per_frame[(max(0, frame_idx - 5)):frame_idx]  # get IDs seen in the last 5 frames
+                if not any(tid in frame_ids for frame_ids in recent_ids):  # if the track has disappeared in the last 5 frames (aka permanently)
+                    if len(points) > 20:  # if the track has disappeared
+                        points_diff = np.diff(np.array(points), axis=0) # compute differences between consecutive points (accounts for parallel paths)
+                        lcss_we = lcss(we_path_diff, points_diff, eps=10.0)  # compute LCSS for west to east path
+                        lcss_ns = lcss(ns_path_diff, points_diff, eps=10.0)  # compute LCSS for north to south path
+                        path_taken = "W-->E" if lcss_we > 0.5 and lcss_we > lcss_ns else "N-->S" if lcss_ns > 0.5 and lcss_ns > lcss_we else "unknown"
+                        if not path_taken == "unknown" and tid not in crossed_ids:
+                            count += 1
+                            crossed_ids.add(tid)
+                            we.append(tid) if path_taken == "W-->E" else ns.append(tid) if path_taken == "N-->S" else None
+                            msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
+                            cross_display.append(msg) # message to display on video
+                            print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
 
-                    # print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss(we_path, points, eps=50.0)}, lcss_ns: {lcss(ns_path, points, eps=50.0)}, points: {points}\n\n")
-                    print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss(we_path_diff, points_diff, eps=15.0)}, lcss_ns: {lcss(ns_path_diff, points_diff, eps=15.0)}, points: {points}\n\n")
+                        print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}, points: {points}\n\n")
 
 
     # ——— report ———
