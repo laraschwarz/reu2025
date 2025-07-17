@@ -30,7 +30,7 @@ class StrongSORT(object):
                  mc_lambda=0.995,
                  ema_alpha=0.9
                 ):
-        
+    
         self.model = ReIDDetectMultiBackend(weights=model_weights, device=device, fp16=fp16)
         
         self.max_dist = max_dist
