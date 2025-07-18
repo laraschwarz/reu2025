@@ -154,6 +154,9 @@ def run(
     ew = [] # east to west
     ne = [] # north to east
     ns = [] # north to south
+    sn = [] # south to north
+
+    
 
     cross_display = [] # messages to display on video
 
@@ -294,6 +297,8 @@ def run(
             padding     = 2    # px of padding around the text
             bg_color    = (0, 0, 0)
             text_color  = (0, 0, 255)
+            while len(cross_display) > 5:  # ensure we have at least 5 lines to display
+                cross_display.pop(0)  # remove the oldest line if we have more than 5
             for j, text in enumerate(cross_display):
                 (w, h), base = cv2.getTextSize(text, font, font_scale, thickness)
                 x, y = 10, 30 + j * 30
@@ -365,29 +370,46 @@ def run(
             
             for tid, points in coords.items():
                 # if tid in lost and (id_to_class[tid]=="person" and len(points) > 50 or id_to_class[tid]=="car" and len(points) > 20):  # if the track has disappeared
-                recent_ids = ids_per_frame[(max(0, frame_idx - 5)):frame_idx]  # get IDs seen in the last 5 frames
+                recent_ids = ids_per_frame[(max(0, frame_idx - 10)):frame_idx]  # get IDs seen in the last 10 frames
 
                 if not any(tid in frame_ids for frame_ids in recent_ids):  # if the track has disappeared in the last 5 frames (aka permanently)
 
                     if id_to_class[tid] == "person" and len(points) > 100:
-                        lcss_ew_up = lcss(ew_path_ped_up, points, eps=15.0)  # compute LCSS for west to east path
+                        lcss_ew_up = lcss(ew_path_ped_up, points, eps=15.0)  # compute LCSS for east to west path
+                        lcss_we_up = lcss(list(reversed(ew_path_ped_up)), points, eps=15.0)  # compute LCSS for west to east path
                         lcss_ns_left  = lcss(ns_path_ped_left, points, eps=15.0)  # compute LCSS for north to south path left
                         lcss_ns_right  = lcss(ns_path_ped_right, points, eps=15.0)  # compute LCSS for north to south path right
-                        path_taken = "E-->W" if lcss_ew_up > 0.5 and lcss_ew_up == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "N-->S" if lcss_ns_left > 0.5 and lcss_ns_left == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "unknown"
+                        lcss_sn_left  = lcss(list(reversed(ns_path_ped_left)), points, eps=15.0)  # compute LCSS for south to north path left
+                        lcss_sn_right  = lcss(list(reversed(ns_path_ped_right)), points, eps=15.0)  # compute LCSS for south to north path right
+
+                        direction_map = {
+                        lcss_ew_up:    "E-->W",
+                        lcss_we_up:    "W-->E",
+                        lcss_ns_left:  "N-->S",
+                        lcss_ns_right: "N-->S",
+                        lcss_sn_left:  "S-->N",
+                        lcss_sn_right: "S-->N",
+                        }
+
+                        # determine path taken
+                        max_lcss = max(lcss_ew_up, lcss_we_up, lcss_ns_left, lcss_ns_right, lcss_sn_left, lcss_sn_right)
+                        if max_lcss > 0.5:  # if path is a match
+                            path_taken = direction_map.get(max_lcss, "unknown") # match lcss to string directio
+                        # path_taken = "E-->W" if lcss_ew_up > 0.5 and lcss_ew_up == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "N-->S" if lcss_ns_left > 0.5 and lcss_ns_left == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "unknown"
                         if not path_taken == "unknown" and tid not in crossed_ids:
                             count += 1
                             crossed_ids.add(tid)
-                            ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else None
+                            ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else we.append(tid) if path_taken == "W-->E" else sn.append(tid) if path_taken == "S-->N" else None
                             msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
                             cross_display.append(msg) # message to display on video
                             print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
-                        print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}\n")
+                        # print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}, lcss_we: {lcss_we_up}, lcss_sn_left: {lcss_sn_left}, lcss_sn_right: {lcss_sn_right}\n")
 
                     elif not id_to_class[tid] == "person":
                         if len(points) > 20:  # if the track has disappeared
                             points_vectors = np.diff(np.array(points), axis=0)         # compute differences between consecutive points (accounts for parallel paths)
-                            lcss_we = lcss(we_path_vectors, points_vectors, eps=2.0)  # compute LCSS  for west to east path vectors
-                            lcss_ns = lcss(ns_path_vectors, points_vectors, eps=2.0)  # compute LCSS for north to south path vectors
+                            lcss_we = lcss(we_path_vectors, points_vectors, eps=5.0)  # compute LCSS  for west to east path vectors
+                            lcss_ns = lcss(ns_path_vectors, points_vectors, eps=5.0)  # compute LCSS for north to south path vectors
                             path_taken = "W-->E" if lcss_we > 0.5 and lcss_we == max(lcss_we, lcss_ns) else "N-->S" if lcss_ns > 0.5 and lcss_ns == max(lcss_we, lcss_ns) else "unknown"
                             if not path_taken == "unknown" and tid not in crossed_ids:
                                 count += 1
@@ -397,7 +419,7 @@ def run(
                                 cross_display.append(msg) # message to display on video
                                 print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
 
-                            # print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}\n")
+                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}")
 
 
     # ——— report ———
@@ -406,11 +428,12 @@ def run(
     print(f"{len(ew)} objects crossed from east to west")
     # print(f"{len(ne)} objects turned from north to east")
     print(f"{len(ns)} objects crossed from north to south")
+    print(f"{len(sn)} objects turned from south to north")
     print(f"Tracked IDs (west to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in we]}")
     print(f"Tracked IDs (east to west): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ew]}")
     # print(f"Tracked IDs (north to east): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ne]}")
     print(f"Tracked IDs (north to south): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in ns]}")
-
+    print(f"Tracked IDs (south to north): {[str(tid) + ' (' + id_to_class.get(tid, 'unknown') + ')' for tid in sn]}")
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
