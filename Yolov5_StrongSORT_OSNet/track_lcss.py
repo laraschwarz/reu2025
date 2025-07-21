@@ -348,7 +348,8 @@ def run(
                     tid = int(out[4])
                     cls_index=int(out[5])
                     cls_name= names[cls_index] if cls_index < len(names) else 'unknown'
-                    id_to_class[tid] = cls_name  # map track ID to class label
+                    if tid not in id_to_class: # remember class on first frame detection
+                        id_to_class[tid] = cls_name  # map track ID to class label
                     # compute center
                     cx = (out[0] + out[2]) / 2
                     cy = (out[1] + out[3]) / 2
@@ -396,20 +397,20 @@ def run(
                         if max_lcss > 0.5:  # if path is a match
                             path_taken = direction_map.get(max_lcss, "unknown") # match lcss to string directio
                         # path_taken = "E-->W" if lcss_ew_up > 0.5 and lcss_ew_up == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "N-->S" if lcss_ns_left > 0.5 and lcss_ns_left == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "unknown"
-                        if not path_taken == "unknown" and tid not in crossed_ids:
-                            count += 1
-                            crossed_ids.add(tid)
-                            ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else we.append(tid) if path_taken == "W-->E" else sn.append(tid) if path_taken == "S-->N" else None
-                            msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
-                            cross_display.append(msg) # message to display on video
-                            print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
-                        # print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}, lcss_we: {lcss_we_up}, lcss_sn_left: {lcss_sn_left}, lcss_sn_right: {lcss_sn_right}\n")
+                            if not path_taken == "unknown" and tid not in crossed_ids:
+                                count += 1
+                                crossed_ids.add(tid)
+                                ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else we.append(tid) if path_taken == "W-->E" else sn.append(tid) if path_taken == "S-->N" else None
+                                msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
+                                cross_display.append(msg) # message to display on video
+                                print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
+                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}, lcss_we: {lcss_we_up}, lcss_sn_left: {lcss_sn_left}, lcss_sn_right: {lcss_sn_right}\n")
 
                     elif not id_to_class[tid] == "person":
-                        if len(points) > 20:  # if the track has disappeared
+                        if len(points) > 20:  # if the track is long enough
                             points_vectors = np.diff(np.array(points), axis=0)         # compute differences between consecutive points (accounts for parallel paths)
-                            lcss_we = lcss(we_path_vectors, points_vectors, eps=5.0)  # compute LCSS  for west to east path vectors
-                            lcss_ns = lcss(ns_path_vectors, points_vectors, eps=5.0)  # compute LCSS for north to south path vectors
+                            lcss_we = lcss(we_path_vectors, points_vectors, eps=10.0)  # compute LCSS  for west to east path vectors
+                            lcss_ns = lcss(ns_path_vectors, points_vectors, eps=10.0)  # compute LCSS for north to south path vectors
                             path_taken = "W-->E" if lcss_we > 0.5 and lcss_we == max(lcss_we, lcss_ns) else "N-->S" if lcss_ns > 0.5 and lcss_ns == max(lcss_we, lcss_ns) else "unknown"
                             if not path_taken == "unknown" and tid not in crossed_ids:
                                 count += 1
@@ -419,10 +420,14 @@ def run(
                                 cross_display.append(msg) # message to display on video
                                 print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
 
-                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}")
+                            print("points_vectors: " + str(points_vectors))
+                            print("we_path_vectors: " + str(we_path_vectors))
+                            print("ns_path_vectors: " + str(ns_path_vectors))
+                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}+\n")
 
 
     # ——— report ———
+    print(id_to_class)
 
     print(f"{len(we)} objects crossed from west to east")
     print(f"{len(ew)} objects crossed from east to west")
