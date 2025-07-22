@@ -12,9 +12,12 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import sys
 import numpy as np
+import math
 from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
+from fastdtw import fastdtw
+from scipy.spatial.distance import cosine
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
@@ -146,7 +149,7 @@ def run(
     names = model.names
     id_to_class = {}      # will map each track ID to its class label
     ids_per_frame = []  # will map each frame to the set of IDs seen in that frame
-    recent_ids = []  # will store the IDs seen in the last 5 frames
+    recent_ids = []  # will store the IDs seen in the last 10 frames
 
     # count how many objects crossed from west to east
     count = 0
@@ -163,8 +166,10 @@ def run(
     # base path for objects that cross from west to east, based on car ID:10
     we_path = [(39.5, 229.0), (45.5, 232.0), (52.0, 236.5), (59.5, 242.5), (66.5, 250.0), (73.5, 256.0), (83.5, 264.5), (98.0, 271.5), (111.5, 280.5), (126.5, 287.5), (140.0, 293.5), (155.0, 301.5), (170.0, 308.0), (183.5, 316.0), (200.0, 324.5), (213.5, 332.5), (230.5, 340.0), (246.0, 349.5), (262.0, 357.0), (277.0, 364.5), (293.0, 372.5), (307.0, 381.0), (325.0, 390.0), (342.0, 399.0), (358.0, 407.5), (375.5, 416.0), (392.0, 425.0), (408.5, 432.0), (426.5, 441.5), (441.5, 450.5), (460.5, 459.0), (478.0, 467.5), (496.0, 476.5), (513.5, 486.5), (532.0, 495.0), (550.0, 505.0), (568.0, 515.0), (587.5, 523.5), (606.0, 535.0), (625.5, 544.5), (644.5, 555.0), (664.5, 565.5), (684.0, 575.0), (704.0, 586.0), (724.5, 596.0), (745.5, 608.5), (766.0, 619.0), (787.0, 629.5), (808.5, 641.0), (831.5, 646.5), (853.0, 651.0), (874.5, 656.0), (897.5, 663.0), (918.5, 669.0), (923.5, 675.0), (948.0, 680.5), (962.0, 686.5), (970.5, 692.5), (986.5, 698.0), (1002.0, 705.0), (1019.5, 711.5)]
     we_path_vectors = np.diff(np.array(we_path), axis=0) # compute differences between consecutive points (accounts for parallel paths)
+    we_unit_vectors = get_unit_vectors(we_path)  # compute unit vectors for each segment of the path
     ns_path = [(890.0, 8.5), (889.5, 9.0), (889.0, 9.0), (888.5, 9.0), (888.5, 9.5), (888.5, 9.5), (887.0, 10.0), (886.0, 10.5), (886.0, 11.0), (886.0, 11.5), (885.5, 11.5), (885.0, 11.5), (885.0, 12.0), (885.0, 12.0), (884.5, 12.5), (884.0, 12.5), (883.5, 13.0), (883.0, 13.0), (883.0, 13.5), (882.0, 13.5), (881.5, 13.5), (881.0, 14.0), (879.5, 14.5), (879.0, 15.0), (878.5, 15.0), (878.0, 15.0), (877.0, 15.5), (877.5, 16.0), (877.0, 16.0), (876.5, 16.5), (875.5, 17.0), (876.0, 17.5), (875.5, 18.0), (874.5, 18.0), (874.0, 18.5), (874.0, 19.0), (874.0, 19.5), (873.5, 20.0), (872.0, 21.0), (871.5, 21.5), (870.5, 22.0), (870.5, 22.5), (869.5, 23.5), (869.5, 24.0), (867.0, 24.5), (865.5, 25.5), (866.0, 26.5), (866.0, 27.5), (867.0, 28.5), (868.0, 28.5), (866.5, 29.0), (866.0, 29.5), (866.0, 30.0), (865.5, 31.0), (865.0, 31.5), (865.0, 32.0), (865.5, 33.0), (864.5, 34.0), (863.0, 35.0), (863.5, 36.0), (866.5, 36.5), (868.0, 37.0), (866.5, 37.5), (865.0, 38.0), (864.0, 39.0), (863.5, 40.0), (862.5, 40.5), (861.0, 41.5), (859.5, 42.5), (857.0, 44.0), (856.5, 45.0), (855.0, 45.5), (854.5, 46.5), (853.5, 47.5), (852.0, 48.5), (850.5, 50.0), (849.5, 51.0), (848.0, 52.0), (846.5, 53.0), (844.5, 53.5), (843.5, 54.0), (842.0, 55.0), (841.0, 56.0), (839.5, 57.0), (837.5, 58.5), (836.0, 60.0), (834.5, 61.0), (832.5, 62.5), (830.5, 63.5), (828.5, 66.0), (826.5, 66.5), (825.5, 67.5), (823.5, 68.5), (821.0, 69.0), (819.0, 70.5), (817.0, 71.5), (815.0, 72.5), (813.5, 74.0), (811.0, 75.5), (810.5, 77.5), (808.5, 79.0), (806.0, 82.0), (804.0, 85.5), (802.5, 88.5), (800.5, 91.5), (798.5, 93.5), (795.5, 95.5), (794.5, 98.0), (791.5, 101.0), (790.0, 103.5), (787.5, 106.0), (785.0, 108.5), (783.0, 111.0), (781.0, 113.5), (780.0, 117.0), (777.0, 120.0), (774.0, 123.0), (771.0, 125.0), (768.5, 128.0), (765.0, 131.0), (763.0, 133.5), (761.5, 136.5), (759.5, 139.0), (757.5, 142.0), (755.5, 144.5), (754.0, 147.5), (751.0, 151.0), (748.0, 154.0), (747.5, 157.5), (744.5, 160.0), (742.5, 162.5), (740.0, 166.5), (737.0, 170.0), (733.5, 173.0), (730.0, 176.5), (728.0, 179.5), (725.0, 183.5), (722.5, 186.5), (720.5, 189.5), (718.0, 192.0), (714.5, 195.5), (711.5, 198.5), (707.5, 202.5), (705.0, 207.0), (702.5, 210.5), (700.5, 214.5), (696.5, 218.0), (694.5, 221.5), (691.5, 225.0), (688.5, 230.0), (685.0, 233.5), (682.0, 237.5), (678.5, 241.0), (675.5, 245.5), (672.0, 249.5), (668.5, 253.5), (665.0, 258.0), (661.0, 265.0), (659.0, 268.0), (654.5, 272.5), (651.0, 276.0), (647.0, 279.5), (643.5, 284.0), (639.5, 288.5), (635.5, 293.5), (631.0, 298.5), (628.0, 304.5), (625.0, 309.5), (621.5, 314.0), (616.5, 318.5), (613.0, 322.5), (608.5, 328.0), (605.0, 334.0), (601.5, 339.0), (598.0, 343.5), (593.0, 347.5), (589.5, 353.0), (584.5, 358.0), (579.0, 366.0), (574.0, 371.5), (571.5, 376.0), (567.0, 381.0), (561.5, 386.5), (558.5, 392.5), (553.5, 398.0), (547.5, 404.5), (543.0, 410.5), (539.5, 417.0), (534.5, 423.5), (529.0, 428.0), (525.0, 433.5), (520.0, 441.0), (514.0, 447.0), (509.5, 454.0), (504.5, 460.0), (499.0, 465.5), (494.0, 472.5), (489.0, 480.0), (483.5, 486.5), (478.0, 494.0), (473.0, 500.5), (467.5, 508.5), (461.5, 515.5), (455.0, 521.5), (450.5, 529.5), (444.5, 537.0), (438.0, 545.0), (432.0, 552.0), (426.0, 559.5), (420.5, 567.5), (414.5, 576.0), (408.0, 583.0), (402.0, 591.0), (395.0, 599.5), (389.5, 607.5), (383.0, 614.5), (377.0, 619.5), (370.0, 623.0), (364.0, 627.5), (356.5, 631.5), (350.0, 636.0), (346.0, 640.0), (341.0, 644.5), (338.5, 649.5), (333.5, 653.0), (330.5, 657.5), (325.0, 662.0), (322.5, 666.0), (317.5, 670.5), (313.0, 675.5), (309.5, 681.0), (305.5, 686.0), (303.5, 690.5), (299.5, 695.5)]
     ns_path_vectors = np.diff(np.array(ns_path), axis=0) # compute differences between consecutive points (accounts for parallel paths)
+    ns_unit_vectors = get_unit_vectors(ns_path)  # compute unit vectors for each segment of the path
 
     ns_path_ped_left = [(1010.0, 449.0), (1009.5, 449.5), (1008.5, 450.5), (413.0, 240.5), (377.0, 228.0), (407.5, 238.0), (405.5, 237.5), (405.0, 238.0), (403.5, 238.0), (403.0, 239.5), (402.0, 240.0), (401.0, 241.0), (400.0, 242.0), (399.0, 243.0), (400.5, 245.5), (400.0, 247.5), (398.5, 250.0), (397.5, 252.5), (396.5, 253.0), (396.0, 254.5), (395.5, 255.5), (395.5, 256.5), (394.5, 257.5), (394.0, 257.0), (393.5, 257.0), (392.0, 258.0), (390.5, 258.0), (389.5, 257.5), (387.5, 257.0), (386.5, 259.0), (386.0, 260.5), (386.0, 263.0), (387.0, 267.0), (385.0, 269.0), (383.0, 268.5), (382.5, 269.5), (381.0, 270.5), (380.5, 271.5), (379.5, 271.5), (378.5, 271.0), (377.0, 270.0), (377.0, 269.0), (374.5, 270.5), (373.0, 270.5), (371.5, 271.0), (370.0, 272.0), (369.0, 273.0), (367.0, 275.0), (359.5, 274.0), (357.0, 274.5), (375.0, 288.0), (368.5, 287.0), (372.5, 290.5), (371.5, 291.0), (369.5, 291.0), (368.0, 290.5), (370.0, 292.5), (370.0, 293.5), (369.0, 294.5), (367.5, 294.0), (358.0, 290.5), (358.0, 292.0), (357.5, 292.5), (356.5, 293.0), (358.0, 295.0), (360.0, 297.0), (360.5, 300.5), (359.0, 302.5), (338.0, 291.0), (348.5, 299.0), (347.5, 300.0), (350.0, 304.5), (352.0, 306.5), (353.0, 308.5), (352.5, 308.0), (344.5, 303.0), (340.0, 301.5), (339.0, 301.5), (337.5, 302.0), (344.0, 312.0), (343.0, 314.5), (342.5, 316.0), (333.5, 328.5), (333.0, 330.0), (331.0, 330.0), (331.5, 330.5), (330.0, 331.5), (330.5, 332.0), (331.0, 334.5), (330.5, 336.5), (330.0, 338.0), (319.5, 338.5), (327.0, 340.0), (326.5, 341.0), (311.0, 340.5), (309.5, 343.0), (308.0, 344.0), (303.5, 345.0), (302.0, 345.5), (307.5, 350.5), (307.0, 353.5), (305.0, 357.0), (306.5, 359.5), (305.5, 361.5), (305.0, 363.0), (305.0, 365.0), (303.5, 366.0), (302.5, 367.0), (301.5, 367.5), (300.5, 367.5), (294.0, 367.0), (291.0, 365.5), (293.5, 368.5), (292.5, 369.5), (286.5, 367.0), (285.0, 367.5), (283.0, 374.5), (282.5, 375.0), (274.5, 371.0), (278.0, 373.5), (278.5, 374.5), (279.0, 377.5), (277.5, 378.0), (276.5, 379.0), (274.5, 378.5), (273.5, 378.5), (272.5, 379.0), (271.5, 382.0), (270.5, 383.0), (267.5, 385.0), (268.0, 389.5), (267.5, 393.5), (268.0, 395.5), (267.0, 397.5), (271.5, 401.0), (268.5, 402.0), (266.0, 401.0), (265.5, 402.5), (261.5, 400.0), (261.0, 400.0), (259.0, 401.0), (258.5, 400.0), (257.5, 400.5), (296.0, 436.0), (298.5, 438.0), (283.0, 445.0), (283.5, 446.5), (284.0, 449.5), (282.0, 452.5), (279.5, 455.5), (279.0, 457.5), (281.0, 460.5), (281.0, 462.5), (226.5, 438.5), (226.0, 439.0), (221.5, 438.0), (223.5, 440.5), (222.5, 442.0), (222.5, 444.5), (221.5, 448.0), (220.5, 450.0), (220.0, 452.5), (219.0, 453.0), (217.0, 454.0), (220.5, 457.5), (218.0, 455.0), (215.5, 456.0), (220.5, 460.5), (226.5, 471.5), (224.5, 471.0), (223.5, 474.0), (223.5, 476.0), (188.0, 490.5), (191.0, 492.5), (189.0, 495.5), (188.0, 496.5), (176.0, 497.5), (174.5, 498.5), (173.0, 499.0), (172.0, 503.0), (171.5, 505.0), (170.0, 506.5), (169.5, 514.0), (168.0, 513.0), (167.5, 514.5), (166.5, 515.5), (154.0, 528.0), (155.0, 541.5), (153.5, 543.5), (152.0, 547.0), (151.5, 549.5), (151.0, 547.0), (150.0, 545.5), (150.0, 550.0), (146.5, 549.0), (145.5, 548.0), (146.5, 552.0), (145.5, 554.0), (332.0, 70.5), (341.0, 48.0), (198.0, 44.5), (198.0, 43.5), (199.5, 44.5), (200.0, 45.0), (200.5, 45.0), (202.5, 52.5), (203.5, 54.0), (203.0, 55.5), (210.5, 56.5), (211.0, 56.5), (211.5, 56.5), (213.0, 58.0), (214.5, 59.5), (215.0, 60.0), (277.5, 46.5), (276.5, 45.5), (275.0, 44.5), (274.0, 44.0), (278.5, 43.5), (272.0, 44.0), (271.0, 44.0), (269.5, 43.5), (268.5, 43.5), (270.5, 43.0)]
     ns_path_ped_right = [(837.5, 425.5), (837.5, 427.0), (837.5, 427.5), (837.5, 429.0), (837.5, 430.5), (837.0, 430.5), (837.5, 432.5), (837.5, 433.5), (1034.0, 393.0), (1052.0, 390.0), (1030.0, 403.5), (1030.0, 405.5), (1029.0, 409.0), (1029.0, 410.0), (1029.5, 411.5), (1028.5, 412.0), (1028.0, 414.0), (1027.0, 414.0), (1031.5, 414.5), (1002.0, 430.5), (1005.5, 432.5), (1007.5, 435.0), (1003.0, 435.5), (1001.5, 436.5), (999.0, 437.5), (1014.0, 438.5), (1013.0, 439.0), (1012.5, 439.5), (1013.0, 440.5), (1001.5, 453.0), (999.5, 457.0), (999.0, 458.0), (997.0, 459.5), (997.0, 460.5), (996.0, 461.5), (997.5, 462.5), (997.0, 463.0), (996.5, 464.5), (979.5, 468.5), (995.0, 470.0), (981.5, 475.0), (982.0, 476.0), (982.0, 478.5), (980.5, 480.5), (979.5, 481.0), (978.0, 482.5), (975.5, 483.5), (974.5, 485.0), (975.0, 484.5), (976.0, 485.0), (975.5, 485.5), (977.5, 488.5), (976.0, 490.5), (975.5, 491.5), (970.0, 512.0), (969.5, 513.5), (964.5, 518.5), (955.0, 521.5), (959.0, 525.0), (960.0, 527.0), (952.0, 528.0), (950.5, 530.0), (952.0, 530.0), (948.5, 531.0), (947.0, 532.5), (956.0, 533.5), (955.0, 534.0), (953.5, 535.5), (953.5, 536.0), (953.0, 537.0), (929.5, 570.0), (929.5, 572.0), (928.5, 573.5), (917.0, 589.0), (916.5, 590.5), (912.0, 600.0), (912.0, 602.0), (911.5, 603.0), (912.5, 604.0), (911.5, 604.5), (911.5, 605.5), (906.5, 604.5), (905.5, 605.0), (904.5, 606.0), (902.0, 607.5), (900.5, 608.5), (897.5, 612.0), (894.0, 613.5), (894.0, 618.0), (893.0, 619.5), (893.0, 620.5), (892.5, 622.0), (891.5, 623.5), (891.0, 623.5), (889.5, 624.5), (888.0, 626.0), (881.0, 634.5), (879.5, 638.0), (878.0, 642.0), (877.5, 643.5), (876.5, 645.0), (876.0, 646.5), (875.5, 647.5), (874.5, 649.0), (874.5, 652.0), (873.5, 652.5), (873.0, 654.0), (864.5, 656.0), (862.5, 659.5), (859.5, 662.5), (859.5, 666.5), (858.0, 668.5), (858.0, 669.0), (857.5, 671.0), (857.0, 672.5), (856.0, 674.0), (848.0, 689.0), (847.5, 691.0), (846.5, 692.0), (845.5, 693.0), (845.0, 694.0), (845.0, 694.5), (844.0, 695.5), (844.0, 696.5), (843.5, 697.5), (837.5, 702.5), (836.5, 703.5)]
@@ -375,43 +380,49 @@ def run(
 
                 if not any(tid in frame_ids for frame_ids in recent_ids):  # if the track has disappeared in the last 5 frames (aka permanently)
 
-                    if id_to_class[tid] == "person" and len(points) > 100:
-                        lcss_ew_up = lcss(ew_path_ped_up, points, eps=15.0)  # compute LCSS for east to west path
-                        lcss_we_up = lcss(list(reversed(ew_path_ped_up)), points, eps=15.0)  # compute LCSS for west to east path
-                        lcss_ns_left  = lcss(ns_path_ped_left, points, eps=15.0)  # compute LCSS for north to south path left
-                        lcss_ns_right  = lcss(ns_path_ped_right, points, eps=15.0)  # compute LCSS for north to south path right
-                        lcss_sn_left  = lcss(list(reversed(ns_path_ped_left)), points, eps=15.0)  # compute LCSS for south to north path left
-                        lcss_sn_right  = lcss(list(reversed(ns_path_ped_right)), points, eps=15.0)  # compute LCSS for south to north path right
+                    # if id_to_class[tid] == "person" and len(points) > 100:
+                    #     lcss_ew_up = lcss(ew_path_ped_up, points, eps=15.0)  # compute LCSS for east to west path
+                    #     lcss_we_up = lcss(list(reversed(ew_path_ped_up)), points, eps=15.0)  # compute LCSS for west to east path
+                    #     lcss_ns_left  = lcss(ns_path_ped_left, points, eps=15.0)  # compute LCSS for north to south path left
+                    #     lcss_ns_right  = lcss(ns_path_ped_right, points, eps=15.0)  # compute LCSS for north to south path right
+                    #     lcss_sn_left  = lcss(list(reversed(ns_path_ped_left)), points, eps=15.0)  # compute LCSS for south to north path left
+                    #     lcss_sn_right  = lcss(list(reversed(ns_path_ped_right)), points, eps=15.0)  # compute LCSS for south to north path right
 
-                        direction_map = {
-                        lcss_ew_up:    "E-->W",
-                        lcss_we_up:    "W-->E",
-                        lcss_ns_left:  "N-->S",
-                        lcss_ns_right: "N-->S",
-                        lcss_sn_left:  "S-->N",
-                        lcss_sn_right: "S-->N",
-                        }
+                    #     direction_map = {
+                    #     lcss_ew_up:    "E-->W",
+                    #     lcss_we_up:    "W-->E",
+                    #     lcss_ns_left:  "N-->S",
+                    #     lcss_ns_right: "N-->S",
+                    #     lcss_sn_left:  "S-->N",
+                    #     lcss_sn_right: "S-->N",
+                    #     }
 
-                        # determine path taken
-                        max_lcss = max(lcss_ew_up, lcss_we_up, lcss_ns_left, lcss_ns_right, lcss_sn_left, lcss_sn_right)
-                        if max_lcss > 0.5:  # if path is a match
-                            path_taken = direction_map.get(max_lcss, "unknown") # match lcss to string directio
-                        # path_taken = "E-->W" if lcss_ew_up > 0.5 and lcss_ew_up == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "N-->S" if lcss_ns_left > 0.5 and lcss_ns_left == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "unknown"
-                            if not path_taken == "unknown" and tid not in crossed_ids:
-                                count += 1
-                                crossed_ids.add(tid)
-                                ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else we.append(tid) if path_taken == "W-->E" else sn.append(tid) if path_taken == "S-->N" else None
-                                msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
-                                cross_display.append(msg) # message to display on video
-                                print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
-                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}, lcss_we: {lcss_we_up}, lcss_sn_left: {lcss_sn_left}, lcss_sn_right: {lcss_sn_right}\n")
+                    #     # determine path taken
+                    #     max_lcss = max(lcss_ew_up, lcss_we_up, lcss_ns_left, lcss_ns_right, lcss_sn_left, lcss_sn_right)
+                    #     if max_lcss > 0.5:  # if path is a match
+                    #         path_taken = direction_map.get(max_lcss, "unknown") # match lcss to string directio
+                    #     # path_taken = "E-->W" if lcss_ew_up > 0.5 and lcss_ew_up == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "N-->S" if lcss_ns_left > 0.5 and lcss_ns_left == max(lcss_ew_up, lcss_ns_left, lcss_ns_right) else "unknown"
+                    #         if not path_taken == "unknown" and tid not in crossed_ids:
+                    #             count += 1
+                    #             crossed_ids.add(tid)
+                    #             ew.append(tid) if path_taken == "E-->W" else ns.append(tid) if path_taken == "N-->S" else we.append(tid) if path_taken == "W-->E" else sn.append(tid) if path_taken == "S-->N" else None
+                    #             msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
+                    #             cross_display.append(msg) # message to display on video
+                    #             print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
+                    #         print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_ew: {lcss_ew_up}, lcss_ns_left: {lcss_ns_left}, lcss_ns_right: {lcss_ns_right}, lcss_we: {lcss_we_up}, lcss_sn_left: {lcss_sn_left}, lcss_sn_right: {lcss_sn_right}\n")
 
-                    elif not id_to_class[tid] == "person":
+                    if not id_to_class[tid] == "person":
                         if len(points) > 20:  # if the track is long enough
                             points_vectors = np.diff(np.array(points), axis=0)         # compute differences between consecutive points (accounts for parallel paths)
-                            lcss_we = lcss(we_path_vectors, points_vectors, eps=10.0)  # compute LCSS  for west to east path vectors
-                            lcss_ns = lcss(ns_path_vectors, points_vectors, eps=10.0)  # compute LCSS for north to south path vectors
-                            path_taken = "W-->E" if lcss_we > 0.5 and lcss_we == max(lcss_we, lcss_ns) else "N-->S" if lcss_ns > 0.5 and lcss_ns == max(lcss_we, lcss_ns) else "unknown"
+                            points_unit_vectors = get_unit_vectors(points)  # compute unit vectors for the path
+
+                            distance_we, warp_path_we = fastdtw(points_unit_vectors, we_unit_vectors, dist=safe_cosine)
+                            distance_ns, warp_path_ns = fastdtw(points_unit_vectors, ns_unit_vectors, dist=safe_cosine)
+                            avg_we = distance_we / len(warp_path_we)
+                            avg_ns = distance_ns / len(warp_path_ns)
+                            # lcss_we = lcss(we_path_vectors, points_vectors, eps=10.0)  # compute LCSS  for west to east path vectors
+                            # lcss_ns = lcss(ns_path_vectors, points_vectors, eps=10.0)  # compute LCSS for north to south path vectors
+                            path_taken = "W-->E" if avg_we < avg_ns and avg_we < 0.5 else "N-->S" if avg_ns < avg_we and avg_ns < 0.5 else "unknown"
                             if not path_taken == "unknown" and tid not in crossed_ids:
                                 count += 1
                                 crossed_ids.add(tid)
@@ -419,16 +430,12 @@ def run(
                                 msg = f"{id_to_class[tid]} ({tid}) crossed {path_taken}"
                                 cross_display.append(msg) # message to display on video
                                 print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
+                                print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {avg_we}, lcss_ns: {avg_ns}+\n")
 
-                            print("points_vectors: " + str(points_vectors))
-                            print("we_path_vectors: " + str(we_path_vectors))
-                            print("ns_path_vectors: " + str(ns_path_vectors))
-                            print(f"{tid} ({id_to_class.get(tid, 'unknown')}) lcss_we: {lcss_we}, lcss_ns: {lcss_ns}+\n")
+
 
 
     # ——— report ———
-    print(id_to_class)
-
     print(f"{len(we)} objects crossed from west to east")
     print(f"{len(ew)} objects crossed from east to west")
     # print(f"{len(ne)} objects turned from north to east")
@@ -448,6 +455,42 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
+
+def get_unit_vectors(points):
+    # Vs = np.array(vector_list)                    # shape (N,2)
+    # norms = np.linalg.norm(Vs, axis=1, keepdims=True)  
+    # norms[norms == 0] = 1.0                       # avoid div‑by‑zero
+    # Us = Vs / norms
+    Vs = np.diff(np.array(points), axis=0)           # raw deltas
+    norms = np.linalg.norm(Vs, axis=1)
+    zero_idx = np.where(norms < 1e-8)[0]
+    if zero_idx.size > 0:
+        print("Near-zero deltas at rows:", zero_idx)
+        print("Those deltas:", Vs[zero_idx])
+
+    mask = np.linalg.norm(Vs, axis=1) > 1e-8         # keep only non‑zero jumps
+    Vs = Vs[mask]                                    # drop [0,0] rows
+    norms = np.linalg.norm(Vs, axis=1, keepdims=True)
+    Us = Vs / norms                                  # now all uu=1, vv=1 in cosine
+    return Us                                     # shape (N,2)
+
+def safe_cosine(u, v):
+    uu = u[0]*u[0] + u[1]*u[1]
+    vv = v[0]*v[0] + v[1]*v[1]
+    # if either vector is (near) zero‐length, return max distance
+    if uu < 1e-8:
+        # print(f"Zero-length u vector detected: {u}")
+        # print(f"u[0], u[1]: {u[0]}, {u[1]}")
+        return 1.0
+
+    if vv < 1e-8:
+        # print(f"Zero-length v vector detected: {v}")
+        # print(f"v[0], v[1]: {v[0]}, {v[1]}")
+        return 1.0
+    
+    uv = u[0]*v[0] + u[1]*v[1]
+    return 1.0 - uv / math.sqrt(uu * vv)
+
 
 
 def parse_opt():
