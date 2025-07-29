@@ -165,7 +165,7 @@ def run(
     cross_display = [] # messages to display on video
 
     # base path for motorized objects that cross from west to east, based on car ID:10
-    we_path = [(272.5, 209.5), (272.5, 208.0), (272.5, 207.5), (273.0, 207.5), (273.0, 208.0), (273.5, 208.0), (273.5, 206.0), (273.5, 205.5), (181.5, 195.0), (182.0, 196.0), (184.5, 196.5), (187.5, 197.5), (190.0, 198.0), (192.5, 200.0), (191.5, 199.5), (196.0, 203.0), (201.5, 203.5), (201.0, 204.0), (208.0, 206.5), (212.0, 209.0), (213.0, 209.5), (237.0, 217.0), (240.0, 218.0), (275.0, 230.0), (279.5, 232.0), (298.0, 237.5), (309.5, 242.0), (323.0, 247.0), (335.5, 250.0), (348.5, 254.5), (356.5, 257.5), (404.5, 275.0), (424.0, 283.5), (447.0, 291.0), (468.0, 298.5), (492.5, 306.0), (504.5, 311.0), (530.0, 321.0), (558.0, 327.0), (570.5, 332.5), (591.5, 342.0), (606.5, 347.0), (622.0, 356.5), (633.0, 362.5)] 
+    we_path =  [(153.5, 188.0), (156.5, 188.5), (158.0, 189.0), (160.5, 191.5), (162.0, 191.5), (165.5, 192.5), (166.0, 193.0), (168.5, 193.0), (171.5, 194.5), (174.5, 195.5), (176.5, 197.0), (180.5, 198.5), (179.5, 199.0), (182.5, 201.0), (184.5, 202.0), (189.5, 203.0), (194.5, 204.5), (196.5, 206.0), (201.5, 207.5), (209.0, 210.5), (210.5, 213.0), (217.5, 215.5), (223.5, 217.0), (230.0, 220.0), (234.5, 222.5), (242.5, 225.5), (250.0, 228.5), (260.0, 233.0), (272.0, 237.0), (283.5, 241.0), (296.0, 246.0), (303.5, 249.5), (317.5, 254.5), (335.0, 259.5), (353.0, 266.5), (372.5, 275.0), (395.5, 282.5), (408.5, 288.0), (435.0, 298.5), (447.5, 304.0), (496.0, 318.5), (529.5, 335.5), (566.0, 343.5), (589.0, 351.5), (588.5, 351.0), (596.5, 357.5)]  
     we_path_vectors = np.diff(np.array(we_path), axis=0) # compute differences between consecutive points (accounts for parallel paths)
     ns_path = [(505.0, 207.0), (498.5, 208.5), (496.5, 209.0), (487.5, 211.0), (480.0, 214.0), (472.0, 217.5), (463.5, 220.0), (453.0, 223.0), (441.5, 226.0), (431.0, 229.5), (417.5, 234.0), (408.0, 237.0), (399.0, 240.0), (380.0, 245.0), (370.0, 248.0), (341.0, 258.0), (322.5, 263.5), (301.5, 270.0), (286.5, 274.0), (225.5, 292.0), (206.0, 297.0), (130.5, 316.5), (107.5, 321.5), (55.5, 339.0), (47.0, 341.0), (34.0, 344.5), (25.5, 350.0)] 
     ns_path_vectors = np.diff(np.array(ns_path), axis=0) # compute differences between consecutive points (accounts for parallel paths)
@@ -389,7 +389,7 @@ def run(
                 # if tid in lost and (id_to_class[tid]=="person" and len(points) > 50 or id_to_class[tid]=="car" and len(points) > 20):  # if the track has disappeared
                 recent_ids = ids_per_frame[(max(0, frame_idx - 10)):frame_idx]  # get IDs seen in the last 10 frames
 
-                if not any(tid in frame_ids for frame_ids in recent_ids):  # if the track has disappeared in the last 5 frames (aka permanently)
+                if (not any(tid in frame_ids for frame_ids in recent_ids)) and frame_idx%4==0:  # if the track has disappeared in the last 5 frames (aka permanently)
 
                     # if id_to_class[tid] == "person" and len(points) > 100 and tid not in crossed_ids:
                     #     points_vectors = np.diff(np.array(points), axis=0)         # compute differences between consecutive points (accounts for parallel paths)
@@ -457,7 +457,7 @@ def run(
                             avg_cost_sw:  "S-->W",
                             avg_cost_wn:  "W-->N"
                         }
-                        if min_cost < 0.3:  # if path is a match
+                        if min_cost < 0.4:  # if path is a match
                             path_taken = direction_map.get(min_cost, "unknown")
                         # path_taken = "W-->E" if avg_cost_we < avg_cost_ns and avg_cost_we < 0.3 else "N-->S" if avg_cost_ns < avg_cost_we and avg_cost_ns < 0.3 else "unknown"
                             if not path_taken == "unknown" and tid not in crossed_ids:
@@ -469,7 +469,7 @@ def run(
                                 print(str(tid) + ' (' + id_to_class.get(tid, 'unknown') + f') crossed from {path_taken}')
                                 print(f"{tid} ({id_to_class.get(tid, 'unknown')}) dtw_we: {avg_cost_we}, dtw_ns: {avg_cost_ns}, dtw_sw: {avg_cost_sw}, dtw_wn: {avg_cost_wn}, dtw_ne: {avg_cost_ne}, dtw_sn: {avg_cost_sn}, dtw_ew: {avg_cost_ew}\n")
 
-                    # print(f"ID {tid} ({id_to_class.get(tid, 'unknown')}) points: {points} \n")
+                    if tid==25: print(f"ID {tid} ({id_to_class.get(tid, 'unknown')}) points: {points} \n")
 
 
 
